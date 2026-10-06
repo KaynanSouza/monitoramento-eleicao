@@ -13,7 +13,9 @@
     "test:watch": "vitest",
     "fixtures": "tsx scripts/fetch-fixtures.ts",
     "specs": "tsx scripts/fetch-specs.ts",
-    "build-geo": "tsx scripts/build-geo.ts"
+    "build-geo": "tsx scripts/build-geo.ts",
+    "build-replay": "tsx scripts/build-replay.ts",
+    "smoke": "tsx scripts/smoke-tse.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

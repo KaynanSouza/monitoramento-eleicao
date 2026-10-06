@@ -61,6 +61,10 @@ describe('resolverEleicao', () => {
     expect(resolverEleicao(eleicoes, 2, '3')?.codigo).toBe('6260');
   });
 
+  it('Senador e deputados nunca resolvem para 2º turno (evita 404)', () => {
+    for (const cargo of ['5', '6', '7', '8']) expect(resolverEleicao(eleicoes, 2, cargo), cargo).toBeNull();
+  });
+
   it('2º turno publicado no ele-c tem prioridade sobre cdt2', () => {
     const comT2 = [
       ...eleicoes,
