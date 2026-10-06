@@ -35,8 +35,8 @@ export const MapaSvg = memo(function MapaSvg({
   destaque,
 }: Props) {
   const t = useTema();
-  const contorno = t.escuro ? '#0F1115' : '#FFFFFF';
-  const semDados = t.escuro ? '#2A2F38' : '#E3E5E9';
+  const contorno = t.fundo; // contornos na cor do fundo (branco no tema claro)
+  const semDados = t.trilho;
 
   const contornoUfs = useMemo(() => ufs.map(caminhoUf).join(''), [ufs]);
   const destaqueD = useMemo(() => {

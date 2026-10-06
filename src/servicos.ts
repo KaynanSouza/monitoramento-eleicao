@@ -17,6 +17,9 @@ export interface Servicos {
   ajustes: RepositorioAjustes;
   http: TseHttp;
   modo: 'oficial' | 'replay';
+  endpoint: TseEndpoint;
+  /** Apaga o cache HTTP local (o histórico do gráfico é mantido). */
+  limparCache: () => Promise<void>;
 }
 
 let instancia: Promise<Servicos> | null = null;
@@ -58,5 +61,15 @@ async function criar(): Promise<Servicos> {
   }
   const ajustes = new RepositorioAjustes(db);
   const apuracao = new ServicoApuracao({ http, endpoint, historico, ajustes });
-  return { apuracao, historico, ajustes, http, modo: replay ? 'replay' : 'oficial' };
+  return {
+    apuracao,
+    historico,
+    ajustes,
+    http,
+    modo: replay ? 'replay' : 'oficial',
+    endpoint,
+    limparCache: async () => {
+      await db.runAsync('DELETE FROM http_cache', []);
+    },
+  };
 }

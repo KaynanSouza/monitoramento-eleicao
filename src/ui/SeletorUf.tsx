@@ -39,7 +39,7 @@ export function SeletorUf({ visivel, atual, incluirBrasil, ufsPermitidas, aoEsco
               <Pressable
                 onPress={() => aoEscolher(item.uf)}
                 accessibilityRole="button"
-                accessibilityState={{ selected: sel }}
+                aria-selected={sel}
                 style={[styles.item, { borderBottomColor: t.borda }, sel && { backgroundColor: t.superficie }]}
               >
                 <Text style={[styles.nome, { color: t.texto }, sel && styles.sel]}>{item.nome}</Text>

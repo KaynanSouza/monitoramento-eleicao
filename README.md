@@ -107,7 +107,17 @@ Nada fica fixo no código. Na inicialização o app lê
 
 1. se o pleito do 2º turno já estiver publicado, usa a eleição de turno 2 que tem o cargo;
 2. senão, usa o `cdt2` da eleição do 1º turno (hoje: 6257 → **6258**, 6259 → **6260**);
-3. a tela de configurações permite sobrescrever o código à mão.
+3. a tela de configurações (⚙ no topo) permite sobrescrever o código à mão.
+   Ela mostra o código automático e a origem dele: publicado no ele-c, provisório
+   (cdt2) ou manual.
+
+O app abre no 2º turno assim que o TSE publicar essa eleição no ele-c. No 2º turno,
+a tela mostra a disputa com os dois candidatos lado a lado e uma barra dividida.
+Para Governador, a lista de estados mostra só as UFs com 2º turno.
+
+No modo replay há um 2º turno **simulado**, para testar essa tela antes de 25/10:
+os 2 candidatos que o arquivo real do 1º turno marca como "2º turno", com números
+fictícios, sempre com o aviso na tela e nunca com selo "Eleito".
 
 ## Limites do TSE
 

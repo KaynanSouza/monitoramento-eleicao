@@ -19,7 +19,16 @@ const TODAS_UFS = () => obterMalha().ufs.map((u) => u.uf);
 const VAZIO = new Set<string>();
 
 /** Seção "Mapa" da tela principal: mapa da abrangência, 2 primeiros e "Ver mapa completo". */
-export function CartaoMapa({ consulta, dados }: { consulta: Consulta; dados: DadosTela }) {
+export function CartaoMapa({
+  consulta,
+  dados,
+  mostrarCartoes = true,
+}: {
+  consulta: Consulta;
+  dados: DadosTela;
+  /** Falso no 2º turno, quando os 2 cartões já aparecem no topo. */
+  mostrarCartoes?: boolean;
+}) {
   const t = useTema();
   const janela = useWindowDimensions();
   const [largura, setLargura] = useState(0);
@@ -62,11 +71,13 @@ export function CartaoMapa({ consulta, dados }: { consulta: Consulta; dados: Dad
       )}
       <LegendaMapa lideres={lideres} />
 
-      <View style={styles.cartoes}>
-        {dados.resultado.candidatos.slice(0, 2).map((c) => (
-          <CartaoCandidato key={c.sqcand} c={c} foto={dados.foto(c.sqcand)} />
-        ))}
-      </View>
+      {mostrarCartoes && (
+        <View style={styles.cartoes}>
+          {dados.resultado.candidatos.slice(0, 2).map((c) => (
+            <CartaoCandidato key={c.sqcand} c={c} foto={dados.foto(c.sqcand)} />
+          ))}
+        </View>
+      )}
 
       <Pressable
         onPress={() => router.push({ pathname: '/mapa', params: { ...consulta, turno: String(consulta.turno) } })}

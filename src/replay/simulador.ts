@@ -105,6 +105,12 @@ export class Simulador {
 
   /** Conteúdo simulado do arquivo, ou null (404). `caminho` é relativo à base: "oficial/ele2026/...". */
   gerar(caminho: string): string | null {
+    if (caminho.endsWith('/comum/config/ele-c.json') && this.dados[caminho]) {
+      return JSON.stringify(this.eleicoesComSegundoTurno(this.dados[caminho]));
+    }
+    const t2 = /\/ele2026\/(6258|6260)\//.exec(caminho);
+    if (t2) return this.segundoTurno(caminho, t2[1]!);
+
     const config = caminho.replace('/6259/config/mun-e006259-cm.json', '/6257/config/mun-e006257-cm.json');
     if (/\/config\/[^/]+\.json$/.test(config)) return this.dados[config] ? JSON.stringify(this.dados[config]) : null;
 
@@ -121,6 +127,99 @@ export class Simulador {
       return JSON.stringify(this.escalar(this.dados[caminho], p, this.quando(chave, p)));
     }
     return null;
+  }
+
+  // ---------- 2º turno simulado ----------
+  //
+  // Só existe no replay, para testar a tela de disputa antes de 25/10. Usa os 2
+  // candidatos que o arquivo REAL do 1º turno marca como "2º turno", com os votos
+  // do 1º turno entre eles (números fictícios). Nunca marca "Eleito": a simulação
+  // não inventa resultado.
+
+  private static readonly ORIGEM: Record<string, string> = { '6258': '6257', '6260': '6259' };
+
+  /** UFs com 2º turno para governador, segundo os arquivos reais do 1º turno. */
+  private ufsGovernador2t(): string[] {
+    return Object.keys(this.dados)
+      .map((k) => /\/6259\/dados\/([a-z]{2})\/\1-c0003-e006259-u\.json$/.exec(k)?.[1])
+      .filter((uf): uf is string => !!uf && this.finalistas(`oficial/ele2026/6259/dados/${uf}/${uf}-c0003-e006259-u.json`).size === 2)
+      .sort();
+  }
+
+  private finalistas(caminho: string): Set<string> {
+    const d = this.dados[caminho];
+    const s = new Set<string>();
+    if (!d) return s;
+    for (const cargo of d.carg)
+      for (const agr of cargo.agr) for (const par of agr.par) for (const c of par.cand) if (c.st === '2º turno') s.add(c.sqcand);
+    return s;
+  }
+
+  private eleicoesComSegundoTurno(original: Json): Json {
+    const r = JSON.parse(JSON.stringify(original));
+    r.pl.push({
+      cd: '9999',
+      cdpr: '',
+      c: 'ele2026',
+      dt: '25/10/2026',
+      dtlim: '',
+      e: [
+        {
+          cd: '6258',
+          cdt2: '',
+          nm: 'Eleição Ordinária Federal - 2026 2º Turno (SIMULADO no replay)',
+          t: '2',
+          tp: '8',
+          abr: [{ cd: 'br', cp: [{ cd: '1', ds: 'Presidente', tp: '1' }] }],
+        },
+        {
+          cd: '6260',
+          cdt2: '',
+          nm: 'Eleição Ordinária Estadual - 2026 2º Turno (SIMULADO no replay)',
+          t: '2',
+          tp: '1',
+          abr: this.ufsGovernador2t().map((uf) => ({ cd: uf, cp: [{ cd: '3', ds: 'Governador', tp: '1' }] })),
+        },
+      ],
+    });
+    return r;
+  }
+
+  private segundoTurno(caminho: string, ele: string): string | null {
+    const orig = Simulador.ORIGEM[ele]!;
+    const base = caminho.replaceAll(`/${ele}/`, `/${orig}/`).replaceAll(`e00${ele}`, `e00${orig}`);
+    const u = /\/dados\/([a-z]{2})\/\1(\d{5})?-c(\d{4})-e\d{6}-u\.json$/.exec(base);
+    if (u) {
+      const [, uf, , cargo] = u;
+      // 2º turno só de Presidente (6258) e de Governador nas UFs com disputa (6260).
+      if (ele === '6258' && cargo !== '0001') return null;
+      if (ele === '6260' && (cargo !== '0003' || !this.ufsGovernador2t().includes(uf!))) return null;
+    }
+    const corpo = this.gerar(base);
+    if (corpo == null) return null;
+    const r = JSON.parse(corpo);
+    r.ele = ele;
+    r.t = '2';
+    if (!u) return JSON.stringify(r); // acompanhamento / config
+    const fonte =
+      ele === '6258'
+        ? 'oficial/ele2026/6257/dados/br/br-c0001-e006257-u.json'
+        : `oficial/ele2026/6259/dados/${u[1]}/${u[1]}-c0003-e006259-u.json`;
+    const dois = this.finalistas(fonte);
+    for (const cargo of r.carg) {
+      for (const agr of cargo.agr) for (const par of agr.par) par.cand = par.cand.filter((c: Json) => dois.has(c.sqcand));
+      for (const agr of cargo.agr) agr.par = agr.par.filter((p: Json) => p.cand.length);
+      cargo.agr = cargo.agr.filter((a: Json) => a.par.length);
+    }
+    const final = r.tf === 's';
+    const votos = new Map<string, number>();
+    for (const cargo of r.carg)
+      for (const agr of cargo.agr) for (const par of agr.par) for (const c of par.cand) votos.set(c.sqcand, int(c.vap));
+    // Votos já vêm escalados pelo progresso: fator 1 (só recalcula percentuais entre os 2).
+    this.aplicarVotos(r, (c) => votos.get(c.sqcand) ?? 0, 1, false);
+    // Simulação: nenhum selo de situação, mesmo ao fim.
+    r.tf = final ? 's' : 'n';
+    return JSON.stringify(r);
   }
 
   private carimbar(r: Json, quando: number, final: boolean) {

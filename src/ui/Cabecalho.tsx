@@ -16,6 +16,7 @@ export function SeloStatus({ resultado }: { resultado: Resultado | undefined }) 
         style={[styles.status, { backgroundColor: concluida ? t.sucesso : t.andamento }]}
         accessibilityRole="text"
         accessibilityLabel={texto}
+        accessibilityLiveRegion="polite"
       >
         <Text style={[styles.statusTexto, { color: concluida ? t.sucessoTexto : t.andamentoTexto }]}>
           {concluida ? '✓ ' : '● '}
@@ -66,7 +67,7 @@ export function AbasCargo({
             key={c.codigo}
             onPress={() => aoEscolher(c.codigo)}
             accessibilityRole="tab"
-            accessibilityState={{ selected: sel }}
+            aria-selected={sel}
             accessibilityLabel={c.nome}
             style={[styles.aba, sel && { borderBottomColor: t.destaque }]}
           >

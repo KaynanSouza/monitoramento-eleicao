@@ -2,6 +2,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import type { Consulta } from '@/api/apuracao';
 import { nomeAbrangencia } from '@/lib/ufs';
 import type { Candidato } from '@/tse/types';
@@ -13,6 +14,7 @@ import { SeletorUf } from '@/ui/SeletorUf';
 import { useTema } from '@/ui/tema';
 import { GraficoEvolucao } from '@/ui/GraficoEvolucao';
 import { CartaoMapa } from '@/ui/mapa/CartaoMapa';
+import { Disputa } from '@/ui/Disputa';
 import { SeletorTurno } from '@/ui/SeletorTurno';
 import { useCargos, useHistorico, useResultado, useTurnoPadrao, useUfsEmDisputa } from '@/ui/useApuracao';
 
@@ -51,20 +53,34 @@ export default function Apuracao() {
     };
   }, [finalizada, consulta !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const candidatos: Candidato[] = consulta ? (dados?.resultado.candidatos ?? []) : [];
+  const todos: Candidato[] = consulta ? (dados?.resultado.candidatos ?? []) : [];
+  // 2º turno: tela de disputa com os dois candidatos lado a lado em vez da lista.
+  const disputa = turno === 2 && todos.length === 2 ? (todos as [Candidato, Candidato]) : null;
+  const candidatos = disputa ? [] : todos;
 
   const cabecalho = useMemo(
     () => (
       <View style={styles.cabecalho}>
         <View style={styles.linhaTopo}>
           <SeloStatus resultado={consulta ? dados?.resultado : undefined} />
-          <SeletorTurno
-            turno={turno}
-            aoEscolher={(n) => {
-              setTurno(n);
-              setCargo(null);
-            }}
-          />
+          <View style={styles.acoesTopo}>
+            <SeletorTurno
+              turno={turno}
+              aoEscolher={(n) => {
+                setTurno(n);
+                setCargo(null);
+              }}
+            />
+            <Pressable
+              onPress={() => router.push('/configuracoes')}
+              accessibilityRole="button"
+              accessibilityLabel="Configurações"
+              hitSlop={10}
+              style={styles.engrenagem}
+            >
+              <Text style={[styles.engrenagemTexto, { color: t.textoSecundario }]}>⚙</Text>
+            </Pressable>
+          </View>
         </View>
         <SeletorAbrangencia nome={nomeAbrangencia(uf)} aoTocar={() => setSeletorAberto(true)} />
         {cargos.error ? (
@@ -85,18 +101,19 @@ export default function Apuracao() {
               accessibilityRole="button"
               style={[styles.botao, { backgroundColor: t.destaque }]}
             >
-              <Text style={styles.botaoTexto}>Escolher estado</Text>
+              <Text style={[styles.botaoTexto, { color: t.destaqueTexto }]}>Escolher estado</Text>
             </Pressable>
           </View>
         )}
         {consulta && q.error && !dados && (
           <Text style={[styles.erro, { color: t.erro }]}>{mensagemErro(q.error)}</Text>
         )}
-        {consulta && q.isPending && <ActivityIndicator style={styles.carregando} />}
+        {consulta && q.isPending && <ActivityIndicator style={styles.carregando} color={t.textoSecundario} />}
         {consulta && dados && <BarraSecoes resultado={dados.resultado} />}
+        {disputa && dados && <Disputa candidatos={disputa} foto={dados.foto} />}
       </View>
     ),
-    [consulta, dados, uf, turno, lista, cargoAtual, cargos.error, precisaUf, semDisputa, q.error, q.isPending, t],
+    [consulta, dados, disputa, uf, turno, lista, cargoAtual, cargos.error, precisaUf, semDisputa, q.error, q.isPending, t],
   );
 
   const recarregando = q.isRefetching && !q.isPending;
@@ -114,12 +131,19 @@ export default function Apuracao() {
               <GraficoEvolucao serie={historico.data} finalizada={dados.resultado.totalizacaoFinal} />
             )}
             {/* Mapa só para cargos majoritários: em proporcionais o "mais votado" por município não diz quem se elegeu. */}
-            {consulta && dados && dados.resultado.cargo.vagas <= 2 && <CartaoMapa consulta={consulta} dados={dados} />}
+            {consulta && dados && dados.resultado.cargo.vagas <= 2 && <CartaoMapa consulta={consulta} dados={dados} mostrarCartoes={!disputa} />}
             <Rodape dados={consulta ? dados : undefined} />
           </>
         }
         refreshControl={
-          <RefreshControl refreshing={recarregando} onRefresh={() => q.refetch()} enabled={consulta !== null} />
+          <RefreshControl
+            refreshing={recarregando}
+            onRefresh={() => q.refetch()}
+            enabled={consulta !== null}
+            tintColor={t.textoSecundario}
+            colors={[t.destaque]}
+            progressBackgroundColor={t.superficie}
+          />
         }
         initialNumToRender={12}
         windowSize={7}
@@ -143,11 +167,14 @@ export default function Apuracao() {
 const styles = StyleSheet.create({
   tela: { flex: 1 },
   cabecalho: { padding: 16, gap: 16 },
+  acoesTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  engrenagem: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  engrenagemTexto: { fontSize: 24 },
   linhaTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   erro: { fontSize: 15 },
   carregando: { marginVertical: 24 },
   vazio: { padding: 16, borderRadius: 8, gap: 12, alignItems: 'flex-start' },
   vazioTexto: { fontSize: 16 },
   botao: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  botaoTexto: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  botaoTexto: { fontWeight: '700', fontSize: 15 },
 });

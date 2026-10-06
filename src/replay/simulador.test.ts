@@ -99,3 +99,33 @@ describe('Simulador de apuração', () => {
     expect(d.origem === 'cache' || d.origem === 'nao-modificado').toBe(true);
   });
 });
+
+describe('2º turno simulado (só replay)', () => {
+  it('ele-c ganha a eleição de 2º turno e o resolvedor a encontra', async () => {
+    const { normalizarEleicoes } = await import('@/tse/normalize');
+    const { resolverEleicao, cargosDisponiveis } = await import('@/tse/eleicoes');
+    const sim = emMinuto(300);
+    const els = normalizarEleicoes(JSON.parse(sim.gerar('oficial/comum/config/ele-c.json')!), 'ele2026');
+    expect(resolverEleicao(els, 2, '1')).toMatchObject({ codigo: '6258', origem: 'ele-c' });
+    const gov = resolverEleicao(els, 2, '3')!;
+    expect(gov.codigo).toBe('6260');
+    expect(gov.abrangencias!.length).toBeGreaterThan(0);
+    expect(gov.abrangencias).not.toContain('sp'); // SP elegeu no 1º turno
+    expect(cargosDisponiveis(els, 2).map((c) => c.nome)).toEqual(['Presidente', 'Governador']);
+  });
+
+  it('Presidente: só os 2 finalistas reais, percentuais somam 100, sem selos', () => {
+    const arq = 'oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json';
+    const r = normalizarResultado(JSON.parse(emMinuto(300).gerar(arq)!), arq);
+    expect(r.turno).toBe(2);
+    expect(r.candidatos.map((c) => c.nomeUrna)).toEqual(['FLAVIO BOLSONARO', 'LULA']);
+    expect(r.candidatos[0]!.pct + r.candidatos[1]!.pct).toBeCloseTo(100, 6);
+    expect(r.candidatos.every((c) => c.situacao === 'pendente')).toBe(true);
+  });
+
+  it('Governador só nas UFs com disputa; Senador não existe no 2º turno', () => {
+    const sim = emMinuto(200);
+    expect(sim.gerar('oficial/ele2026/6260/dados/sp/sp-c0003-e006260-u.json')).toBeNull();
+    expect(sim.gerar('oficial/ele2026/6260/dados/ba/ba-c0005-e006260-u.json')).toBeNull();
+  });
+});

@@ -8,7 +8,13 @@ export function AvisosDados({ dados }: { dados: DadosTela | undefined }) {
   const t = useTema();
   if (!dados) return null;
   const avisos: string[] = [];
-  if (dados.modo === 'replay') avisos.push('Modo replay: simulação a partir dos arquivos do 1º turno, sem acesso ao TSE.');
+  if (dados.modo === 'replay') {
+    avisos.push(
+      dados.resultado.turno === 2
+        ? '2º turno SIMULADO (modo replay): candidatos reais do 1º turno, números fictícios. Não é resultado.'
+        : 'Modo replay: simulação a partir dos arquivos do 1º turno, sem acesso ao TSE.',
+    );
+  }
   if (dados.origem === 'offline') {
     const verificado = new Date(dados.verificadoEm).toISOString();
     avisos.push(`Sem conexão com o TSE. Mostrando os dados verificados às ${formatHora(verificado)}.`);
@@ -39,6 +45,10 @@ export function Rodape({ dados }: { dados: DadosTela | undefined }) {
           </Text>
           <Text style={[styles.linha, { color: t.textoSecundario }]}>
             Apuração atualizada em {formatDataHora(dados.resultado.atualizadoEm)} (horário de Brasília)
+          </Text>
+          <Text style={[styles.linha, { color: t.textoSecundario }]}>
+            Conferido no TSE às {formatHora(new Date(dados.verificadoEm).toISOString())}
+            {dados.origem === 'offline' ? ' (sem conexão desde então)' : ''}
           </Text>
         </>
       )}
