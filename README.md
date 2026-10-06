@@ -39,6 +39,15 @@ npm run typecheck
 npm run fixtures    # rebaixa as fixtures do TSE (~220 requisições, ~5 req/s)
 ```
 
+### APK para o celular (sem loja, sem serviço pago)
+
+```bash
+npm run apk          # → dist/apuracao-2026-v<versão>.apk (modo oficial)
+```
+
+Requer JDK 17 e Android Studio (SDK). Preparar o PC, instalar o APK no celular,
+fazer o merge na `main` e checklist do dia 25/10: [docs/PASSO-A-PASSO.md](docs/PASSO-A-PASSO.md).
+
 ### Problemas comuns
 
 - `[Worklets] Mismatch between JavaScript code version and Worklets Babel plugin version`

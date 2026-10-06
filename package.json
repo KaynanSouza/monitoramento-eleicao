@@ -12,10 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "fixtures": "tsx scripts/fetch-fixtures.ts",
-    "specs": "tsx scripts/fetch-specs.ts",
     "build-geo": "tsx scripts/build-geo.ts",
     "build-replay": "tsx scripts/build-replay.ts",
-    "smoke": "tsx scripts/smoke-tse.ts"
+    "smoke": "tsx scripts/smoke-tse.ts",
+    "apk": "node scripts/build-apk.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -30,6 +30,7 @@
     "expo-router": "~57.0.25",
     "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
     "expo-task-manager": "~57.0.21",
     "react": "19.2.3",
     "react-dom": "19.2.3",
