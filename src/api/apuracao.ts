@@ -137,9 +137,11 @@ export class ServicoApuracao {
   }
 
   /**
-   * Carrega todos os municípios de uma UF (sob demanda, para o mapa). Respeita o
-   * limitador global; municípios sem mudança no EA15 vêm do cache. Erros individuais
-   * não interrompem o lote.
+   * Carrega os municípios de uma UF (sob demanda, para o mapa), indexados pelo
+   * código IBGE. Respeita o limitador global; municípios sem mudança no EA15 vêm do
+   * cache. Só busca municípios que o EA15 lista como já totalizados: assim nunca
+   * dispara centenas de 404 (que bloqueiam o IP) antes de a apuração começar.
+   * Erros individuais não interrompem o lote.
    */
   async carregarMunicipios(
     q: Consulta,
@@ -147,10 +149,14 @@ export class ServicoApuracao {
   ): Promise<Map<string, Resultado>> {
     const eleicao = await this.eleicaoPara(q);
     const { cfg, indice } = await this.municipios(eleicao.codigo);
-    const lista = cfg.ufs.find((u) => u.uf === q.uf)?.municipios ?? [];
     const urls = criarUrls(this.d.endpoint, indice);
     const acomp = await this.acompanhamento(eleicao.codigo, q.uf);
     const saida = new Map<string, Resultado>();
+    if (!acomp) return saida;
+    const totalizados = new Set(
+      acomp.itens.filter((i) => i.tipo === 'mun' && i.atualizadoEm).map((i) => i.codigo),
+    );
+    const lista = (cfg.ufs.find((u) => u.uf === q.uf)?.municipios ?? []).filter((m) => totalizados.has(m.tse));
     let feitos = 0;
 
     await Promise.all(
@@ -159,11 +165,29 @@ export class ServicoApuracao {
         const url = urls.resultadoMunicipio(eleicao.codigo, q.cargo, q.uf, m.tse);
         try {
           const resp = await this.buscarComMarcador(url, marcadorDe(acomp, 'mun', m.tse));
-          saida.set(m.tse, normalizarResultado(JSON.parse(resp.corpo), url, q.cargo));
+          saida.set(m.ibge, normalizarResultado(JSON.parse(resp.corpo), url, q.cargo));
         } catch {
           // ainda não publicado / offline sem cache: fica fora do mapa
         } finally {
           opcoes.aoProgredir?.(++feitos, lista.length);
+        }
+      }),
+    );
+    return saida;
+  }
+
+  /**
+   * Resultado de cada UF (para o mapa nacional colorido por estado): 27 arquivos,
+   * todos pelo limitador e com os marcadores do EA14. UFs com erro ficam de fora.
+   */
+  async resultadosUfs(q: Omit<Consulta, 'uf'>, ufs: readonly string[]): Promise<Map<string, Resultado>> {
+    const saida = new Map<string, Resultado>();
+    await Promise.all(
+      ufs.map(async (uf) => {
+        try {
+          saida.set(uf, (await this.resultado({ ...q, uf })).resultado);
+        } catch {
+          // UF ainda sem arquivo / offline sem cache
         }
       }),
     );

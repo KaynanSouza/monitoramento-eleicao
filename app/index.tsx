@@ -12,6 +12,7 @@ import { AvisosDados, Rodape } from '@/ui/Rodape';
 import { SeletorUf } from '@/ui/SeletorUf';
 import { useTema } from '@/ui/tema';
 import { GraficoEvolucao } from '@/ui/GraficoEvolucao';
+import { CartaoMapa } from '@/ui/mapa/CartaoMapa';
 import { SeletorTurno } from '@/ui/SeletorTurno';
 import { useCargos, useHistorico, useResultado, useTurnoPadrao, useUfsEmDisputa } from '@/ui/useApuracao';
 
@@ -112,6 +113,8 @@ export default function Apuracao() {
             {consulta && dados && (
               <GraficoEvolucao serie={historico.data} finalizada={dados.resultado.totalizacaoFinal} />
             )}
+            {/* Mapa só para cargos majoritários: em proporcionais o "mais votado" por município não diz quem se elegeu. */}
+            {consulta && dados && dados.resultado.cargo.vagas <= 2 && <CartaoMapa consulta={consulta} dados={dados} />}
             <Rodape dados={consulta ? dados : undefined} />
           </>
         }

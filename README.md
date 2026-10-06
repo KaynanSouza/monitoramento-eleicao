@@ -39,6 +39,14 @@ npm run typecheck
 npm run fixtures    # rebaixa as fixtures do TSE (~220 requisições, ~5 req/s)
 ```
 
+### Problemas comuns
+
+- `[Worklets] Mismatch between JavaScript code version and Worklets Babel plugin version`
+  (às vezes junto com `Route "./mapa.tsx" is missing the required default export`):
+  o Metro ainda tem em cache arquivos transformados por outra versão do plugin.
+  Rode `npx expo start -c`. As versões do Reanimated e do Worklets têm de ser as do
+  SDK: use sempre `npx expo install`.
+
 ## Coleta (no próprio celular)
 
 - `src/api/http.ts`: cliente com no máximo 1 busca por arquivo a cada 45 s,
@@ -60,6 +68,23 @@ Teste contra o TSE real (cerca de 4 requisições):
 ```bash
 npm run smoke -- 1 1 br      # turno, cargo, uf
 ```
+
+## Mapa
+
+- Malha: `npm run build-geo` gera `src/mapa/geo-brasil.json` (1,6 MB, pré-projetado).
+  Usa a API de malhas do IBGE (qualidade mínima, 2022) e troca MT pela malha 2024
+  do geoftp, que inclui Boa Esperança do Norte. O script valida que 100% dos
+  municípios do `mun-cm.json` do TSE casam pelo código IBGE (`cdi`).
+- Brasil (Presidente): cada estado na cor do líder, com os 27 arquivos estaduais.
+  Os municípios de uma UF são carregados sob demanda quando você toca nela.
+  "Carregar mapa completo" baixa todos, devagar (~8 req/s), com barra de progresso.
+- Um município só é buscado se o EA15 da UF já o lista como totalizado, para
+  evitar uma rajada de 404 antes das 17h.
+- Cor: a do partido do líder, mais clara quanto menor a margem (< 5, 5–10,
+  10–20, 20–35 e ≥ 35 p.p.). A legenda traz os nomes, não só as cores.
+- Mapa completo: pinça para zoom, arraste para mover e toque num município para
+  ver o resultado. Os municípios são desenhados em poucas camadas agrupadas por
+  cor, para manter o desempenho.
 
 ## Modo replay
 

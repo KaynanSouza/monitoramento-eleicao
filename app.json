@@ -26,9 +26,6 @@
       "expo-status-bar",
       "expo-sqlite",
       "expo-background-task"
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    ]
   }
 }

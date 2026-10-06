@@ -7,12 +7,13 @@ export const BASE_TESTE = 'https://tse.teste';
 
 export function servidorFixtures() {
   const chamadas: string[] = [];
-  const sobrescritas = new Map<string, string>();
+  /** Corpo substituto por caminho; null = responder 404. */
+  const sobrescritas = new Map<string, string | null>();
   const fetchFn = (async (entrada: RequestInfo | URL) => {
     const url = String(entrada);
     chamadas.push(url);
     const rel = url.slice(BASE_TESTE.length + 1);
-    const corpo = sobrescritas.get(rel) ?? (existsSync(join(FIXTURES, rel)) ? readFileSync(join(FIXTURES, rel), 'utf8') : null);
+    const corpo = sobrescritas.has(rel) ? (sobrescritas.get(rel) ?? null) : (existsSync(join(FIXTURES, rel)) ? readFileSync(join(FIXTURES, rel), 'utf8') : null);
     if (corpo == null) return new Response('Not Found', { status: 404 });
     return new Response(corpo, { status: 200 });
   }) as typeof fetch;

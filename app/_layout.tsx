@@ -2,7 +2,8 @@ import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Platform, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 // Define a tarefa em segundo plano no escopo global (exigência do TaskManager).
 import { registrarTarefaSegundoPlano } from '@/segundoPlano/tarefa';
 
@@ -16,7 +17,13 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  const [queryClient] = useState(() => new QueryClient());
+  // networkMode "always": quem trata falta de rede é o cliente HTTP (devolve o último dado salvo);
+  // no modo padrão o TanStack pausaria as consultas offline e a tela ficaria sem o cache.
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { networkMode: 'always' }, mutations: { networkMode: 'always' } } }),
+  );
+  // Só em desenvolvimento: acesso pelo console para diagnóstico.
+  if (__DEV__) (globalThis as { __queryClient?: QueryClient }).__queryClient = queryClient;
 
   useEffect(() => {
     registrarTarefaSegundoPlano().catch(() => {
@@ -25,9 +32,11 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={StyleSheet.absoluteFill}>
+      <QueryClientProvider client={queryClient}>
+        <StatusBar style="auto" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

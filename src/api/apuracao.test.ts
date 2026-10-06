@@ -118,6 +118,33 @@ describe('ServicoApuracao (fixtures reais via fetch falso)', () => {
     expect(contar(PRES_BR)).toBe(1);
   });
 
+  it('municípios: só busca os que o EA15 lista como totalizados (evita rajada de 404)', async () => {
+    const { apuracao, srv } = await montar();
+    const AB_AC = 'oficial/ele2026/6257/dados/ac/ac-e006257-ab.json';
+    const ab = lerFixture(AB_AC) as { abr: { tpabr: string; dt: string; ht: string }[] };
+    ab.abr.filter((a) => a.tpabr === 'mun').slice(2).forEach((a) => ((a.dt = ''), (a.ht = '')));
+    srv.sobrescritas.set(AB_AC, JSON.stringify(ab));
+    const m = await apuracao.carregarMunicipios({ turno: 1, cargo: '1', uf: 'ac' });
+    expect(m.size).toBe(2);
+    expect(srv.chamadas.filter((u) => /ac\d{5}-c0001/.test(u))).toHaveLength(2);
+  });
+
+  it('municípios: sem EA15 publicado, nenhuma requisição de município', async () => {
+    const { apuracao, srv } = await montar();
+    srv.sobrescritas.set('oficial/ele2026/6257/dados/rj/rj-e006257-ab.json', null);
+    const m = await apuracao.carregarMunicipios({ turno: 1, cargo: '1', uf: 'rj' });
+    expect(m.size).toBe(0);
+    expect(srv.chamadas.filter((u) => /rj\d{5}-c0001/.test(u))).toHaveLength(0);
+  });
+
+  it('mapa nacional: resultado das 27 UFs', async () => {
+    const { apuracao } = await montar();
+    const ufs = ['sp', 'rj', 'mg'];
+    const m = await apuracao.resultadosUfs({ turno: 1, cargo: '1' }, ufs);
+    expect([...m.keys()].sort()).toEqual(['mg', 'rj', 'sp']);
+    expect(m.get('sp')!.abrangencia).toBe('sp');
+  });
+
   it('municípios do AC: só URLs do mun-cm, todos carregados, progresso informado', async () => {
     const { apuracao, srv } = await montar();
     const progresso: number[] = [];

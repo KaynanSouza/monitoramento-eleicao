@@ -23,6 +23,8 @@ let instancia: Promise<Servicos> | null = null;
 
 export function obterServicos(): Promise<Servicos> {
   instancia ??= criar();
+  // Só em desenvolvimento: acesso pelo console para diagnóstico.
+  if (__DEV__) (globalThis as { __servicos?: Promise<Servicos> }).__servicos = instancia;
   return instancia;
 }
 
