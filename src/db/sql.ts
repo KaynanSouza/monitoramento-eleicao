@@ -173,6 +173,11 @@ export class RepositorioHistorico {
     return true;
   }
 
+  /** Apaga todo o histórico (usado ao iniciar o modo replay, cujo banco é descartável). */
+  async limpar(): Promise<void> {
+    await this.db.runAsync('DELETE FROM snapshots', []);
+  }
+
   async ultimo(e: Escopo): Promise<Snapshot | null> {
     const r = await this.db.getFirstAsync<LinhaSnapshot>(
       `SELECT * FROM snapshots WHERE eleicao = ? AND cargo = ? AND abrangencia = ?

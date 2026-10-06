@@ -49,6 +49,11 @@ async function criar(): Promise<Servicos> {
     intervaloMinimoMs: replay ? 5_000 : 45_000,
   });
   const historico = new RepositorioHistorico(db);
+  if (replay) {
+    // Cada execução do replay é uma apuração nova: não misturar com execuções anteriores.
+    await historico.limpar();
+    await db.runAsync('DELETE FROM http_cache', []);
+  }
   const ajustes = new RepositorioAjustes(db);
   const apuracao = new ServicoApuracao({ http, endpoint, historico, ajustes });
   return { apuracao, historico, ajustes, http, modo: replay ? 'replay' : 'oficial' };

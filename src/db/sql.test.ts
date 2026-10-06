@@ -54,6 +54,8 @@ describe('SQLite (node:sqlite com o mesmo SQL do app)', () => {
     ]);
     expect(l[0]!.candidatos[0]!.sigla).toBe('PL');
     expect(await h.listar({ eleicao: '6258', cargo: '1', abrangencia: 'sp' })).toEqual([]);
+    await h.limpar();
+    expect(await h.listar({ eleicao: '6258', cargo: '1', abrangencia: 'br' })).toEqual([]);
   });
 
   it('ajustes: escopos observados sem repetição, mais recente primeiro', async () => {

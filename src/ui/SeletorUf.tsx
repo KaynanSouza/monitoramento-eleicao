@@ -8,13 +8,16 @@ interface Props {
   atual: string;
   /** Mostrar a opção "Brasil" (só faz sentido para cargos nacionais). */
   incluirBrasil: boolean;
+  /** UFs com disputa (2º turno estadual); null = todas. */
+  ufsPermitidas?: string[] | null;
   aoEscolher: (uf: string) => void;
   aoFechar: () => void;
 }
 
-export function SeletorUf({ visivel, atual, incluirBrasil, aoEscolher, aoFechar }: Props) {
+export function SeletorUf({ visivel, atual, incluirBrasil, ufsPermitidas, aoEscolher, aoFechar }: Props) {
   const t = useTema();
-  const itens = [...(incluirBrasil ? [{ uf: 'br', nome: 'Brasil' }] : []), ...UFS];
+  const ufs = ufsPermitidas ? UFS.filter((u) => ufsPermitidas.includes(u.uf)) : UFS;
+  const itens = [...(incluirBrasil ? [{ uf: 'br', nome: 'Brasil' }] : []), ...ufs];
   return (
     <Modal visible={visivel} animationType="slide" onRequestClose={aoFechar}>
       <SafeAreaView style={[styles.tela, { backgroundColor: t.fundo }]}>
@@ -29,6 +32,7 @@ export function SeletorUf({ visivel, atual, incluirBrasil, aoEscolher, aoFechar 
         <FlatList
           data={itens}
           keyExtractor={(i) => i.uf}
+          initialNumToRender={28}
           renderItem={({ item }) => {
             const sel = item.uf === atual;
             return (

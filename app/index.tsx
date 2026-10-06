@@ -11,13 +11,17 @@ import { mensagemErro } from '@/ui/mensagens';
 import { AvisosDados, Rodape } from '@/ui/Rodape';
 import { SeletorUf } from '@/ui/SeletorUf';
 import { useTema } from '@/ui/tema';
-import { useCargos, useResultado } from '@/ui/useApuracao';
+import { GraficoEvolucao } from '@/ui/GraficoEvolucao';
+import { SeletorTurno } from '@/ui/SeletorTurno';
+import { useCargos, useHistorico, useResultado, useTurnoPadrao, useUfsEmDisputa } from '@/ui/useApuracao';
 
 const TAG_TELA_LIGADA = 'apuracao';
 
 export default function Apuracao() {
   const t = useTema();
-  const [turno] = useState<1 | 2>(1); // seletor de turno: fase 5
+  const [turnoEscolhido, setTurno] = useState<1 | 2 | null>(null);
+  const turnoPadrao = useTurnoPadrao();
+  const turno: 1 | 2 = turnoEscolhido ?? turnoPadrao.data ?? 1;
   const [cargo, setCargo] = useState<string | null>(null);
   const [uf, setUf] = useState('br');
   const [seletorAberto, setSeletorAberto] = useState(false);
@@ -26,12 +30,16 @@ export default function Apuracao() {
   const lista = cargos.data ?? [];
   const cargoAtual = lista.find((c) => c.codigo === cargo) ?? lista[0];
 
-  // Cargos sem resultado nacional exigem uma UF.
-  const precisaUf = cargoAtual !== undefined && !cargoAtual.nacional && uf === 'br';
+  const ufsDisputa = useUfsEmDisputa(turno, cargoAtual?.codigo).data ?? null;
+
+  // Cargos sem resultado nacional exigem uma UF; no 2º turno estadual, uma UF com disputa.
+  const semDisputa = ufsDisputa !== null && uf !== 'br' && !ufsDisputa.includes(uf);
+  const precisaUf = cargoAtual !== undefined && ((!cargoAtual.nacional && uf === 'br') || semDisputa);
   const consulta: Consulta | null = cargoAtual && !precisaUf ? { turno, cargo: cargoAtual.codigo, uf } : null;
   const q = useResultado(consulta);
   const dados = q.data;
   const finalizada = dados?.resultado.totalizacaoFinal ?? false;
+  const historico = useHistorico(consulta, dados?.eleicao.codigo, dados?.verificadoEm);
 
   // Mantém a tela ligada enquanto a apuração estiver em andamento.
   useEffect(() => {
@@ -47,7 +55,16 @@ export default function Apuracao() {
   const cabecalho = useMemo(
     () => (
       <View style={styles.cabecalho}>
-        <SeloStatus resultado={consulta ? dados?.resultado : undefined} />
+        <View style={styles.linhaTopo}>
+          <SeloStatus resultado={consulta ? dados?.resultado : undefined} />
+          <SeletorTurno
+            turno={turno}
+            aoEscolher={(n) => {
+              setTurno(n);
+              setCargo(null);
+            }}
+          />
+        </View>
         <SeletorAbrangencia nome={nomeAbrangencia(uf)} aoTocar={() => setSeletorAberto(true)} />
         {cargos.error ? (
           <Text style={[styles.erro, { color: t.erro }]}>{mensagemErro(cargos.error)}</Text>
@@ -58,7 +75,9 @@ export default function Apuracao() {
         {precisaUf && (
           <View style={[styles.vazio, { backgroundColor: t.superficie }]}>
             <Text style={[styles.vazioTexto, { color: t.texto }]}>
-              {cargoAtual?.nome} não tem resultado nacional. Escolha um estado.
+              {semDisputa
+                ? `Não há ${turno}º turno para ${cargoAtual?.nome} em ${nomeAbrangencia(uf)}. Escolha um estado com disputa.`
+                : `${cargoAtual?.nome} não tem resultado nacional. Escolha um estado.`}
             </Text>
             <Pressable
               onPress={() => setSeletorAberto(true)}
@@ -76,7 +95,7 @@ export default function Apuracao() {
         {consulta && dados && <BarraSecoes resultado={dados.resultado} />}
       </View>
     ),
-    [consulta, dados, uf, lista, cargoAtual, cargos.error, precisaUf, q.error, q.isPending, t],
+    [consulta, dados, uf, turno, lista, cargoAtual, cargos.error, precisaUf, semDisputa, q.error, q.isPending, t],
   );
 
   const recarregando = q.isRefetching && !q.isPending;
@@ -88,7 +107,14 @@ export default function Apuracao() {
         keyExtractor={(c) => c.sqcand}
         renderItem={({ item }) => <LinhaCandidato candidato={item} foto={dados?.foto(item.sqcand) ?? null} />}
         ListHeaderComponent={cabecalho}
-        ListFooterComponent={<Rodape dados={consulta ? dados : undefined} />}
+        ListFooterComponent={
+          <>
+            {consulta && dados && (
+              <GraficoEvolucao serie={historico.data} finalizada={dados.resultado.totalizacaoFinal} />
+            )}
+            <Rodape dados={consulta ? dados : undefined} />
+          </>
+        }
         refreshControl={
           <RefreshControl refreshing={recarregando} onRefresh={() => q.refetch()} enabled={consulta !== null} />
         }
@@ -100,6 +126,7 @@ export default function Apuracao() {
         visivel={seletorAberto}
         atual={uf}
         incluirBrasil={cargoAtual?.nacional ?? true}
+        ufsPermitidas={ufsDisputa}
         aoEscolher={(novo) => {
           setUf(novo);
           setSeletorAberto(false);
@@ -113,6 +140,7 @@ export default function Apuracao() {
 const styles = StyleSheet.create({
   tela: { flex: 1 },
   cabecalho: { padding: 16, gap: 16 },
+  linhaTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   erro: { fontSize: 15 },
   carregando: { marginVertical: 24 },
   vazio: { padding: 16, borderRadius: 8, gap: 12, alignItems: 'flex-start' },
