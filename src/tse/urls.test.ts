@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lerFixture } from '@/test/fixtures';
-import { resolverEleicao } from './eleicoes';
+import { cargosDisponiveis, resolverEleicao } from './eleicoes';
 import { normalizarEleicoes, normalizarMunicipios } from './normalize';
 import { criarUrls, IndiceMunicipios, UrlInvalidaError } from './urls';
 
@@ -90,6 +90,16 @@ describe('resolverEleicao', () => {
       origem: 'manual',
       abrangencias: null,
     });
+  });
+
+  it('cargos disponíveis por turno (abas)', () => {
+    expect(cargosDisponiveis(eleicoes, 1)).toEqual([
+      { codigo: '1', nome: 'Presidente', nacional: true },
+      { codigo: '3', nome: 'Governador', nacional: false },
+      { codigo: '5', nome: 'Senador', nacional: false },
+      { codigo: '6', nome: 'Deputado Federal', nacional: false },
+    ]);
+    expect(cargosDisponiveis(eleicoes, 2).map((c) => c.nome)).toEqual(['Presidente', 'Governador']);
   });
 
   it('cargo inexistente', () => {

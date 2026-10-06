@@ -37,7 +37,7 @@ async function criar(): Promise<Servicos> {
     const { Simulador, criarFetchReplay } = require('./replay/simulador') as typeof import('./replay/simulador');
     const dados = require('./replay/dados.json');
     endpoint = { base: 'https://replay.local', ambiente: 'oficial', ciclo: 'ele2026' };
-    fetchFn = criarFetchReplay(new Simulador(dados, { velocidade: config.replaySpeed }), endpoint.base);
+    fetchFn = criarFetchReplay(new Simulador(dados, { velocidade: config.replaySpeed, inicioMin: config.replayInicioMin }), endpoint.base);
   }
 
   const http = new TseHttp({

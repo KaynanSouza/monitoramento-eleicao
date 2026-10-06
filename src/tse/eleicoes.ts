@@ -21,6 +21,35 @@ export interface EleicaoResolvida {
   abrangencias: string[] | null;
 }
 
+export interface CargoDisponivel {
+  codigo: string;
+  nome: string;
+  /** true se o cargo tem resultado nacional (abrangência "br"), ex.: Presidente. */
+  nacional: boolean;
+}
+
+/** Cargos exibidos como abas (na ordem do ele-c). Os demais (Dep. Estadual etc.) ficam fora. */
+const CARGOS_EXIBIDOS = /^(presidente|governador|senador|deputado federal)$/i;
+const CARGOS_NACIONAIS = /^presidente$/i;
+
+/**
+ * Cargos disponíveis no turno, derivados do ele-c.json. No 2º turno ainda não
+ * publicado, usa os cargos do 1º turno que podem ter 2º turno (via cdt2).
+ */
+export function cargosDisponiveis(eleicoes: EleicaoMeta[], turno: 1 | 2): CargoDisponivel[] {
+  let cargos = eleicoes.filter((e) => e.turno === turno).flatMap((e) => e.cargos);
+  if (turno === 2 && cargos.length === 0) {
+    cargos = eleicoes
+      .filter((e) => e.turno === 1 && e.codigoSegundoTurno)
+      .flatMap((e) => e.cargos)
+      .filter((c) => CARGOS_COM_SEGUNDO_TURNO.test(c.nome.trim()));
+  }
+  const vistos = new Set<string>();
+  return cargos
+    .filter((c) => CARGOS_EXIBIDOS.test(c.nome.trim()) && !vistos.has(c.codigo) && vistos.add(c.codigo))
+    .map((c) => ({ codigo: c.codigo, nome: c.nome.trim(), nacional: CARGOS_NACIONAIS.test(c.nome.trim()) }));
+}
+
 /** Chave de ajuste manual: "1:1" = 1º turno, Presidente. */
 export type AjustesManuais = Partial<Record<`${1 | 2}:${string}`, string>>;
 

@@ -48,13 +48,26 @@ export function formatHora(iso: string | null): string {
 
 const MINUSCULAS = new Set(['da', 'das', 'de', 'do', 'dos', 'e']);
 
-/** "ESCRITOR AUGUSTO CURY" → "Escritor Augusto Cury"; "DA SILVA" mantém conectivos minúsculos. */
+/** Siglas com vogal que não dá para detectar pela forma. */
+const SIGLAS = new Set(['ACM', 'ONG', 'TV', 'UFBA', 'USP']);
+/** Abreviações sem vogal que são títulos, não siglas: "Dr", "Sgt". */
+const TITULOS = new Set(['DR', 'DRA', 'JR', 'SGT', 'SR', 'SRA', 'PR', 'PROF', 'CB', 'TEN', 'CEL', 'MAJ', 'CAP']);
+
+/**
+ * "ESCRITOR AUGUSTO CURY" → "Escritor Augusto Cury"; conectivos ficam minúsculos.
+ * Palavras sem vogal ("DJ", "MLB") e siglas conhecidas ("ACM") ficam em maiúsculas.
+ */
 export function nomeProprio(nome: string): string {
   return nome
-    .toLocaleLowerCase('pt-BR')
     .split(/\s+/)
     .filter(Boolean)
-    .map((p, i) => (i > 0 && MINUSCULAS.has(p) ? p : p.charAt(0).toLocaleUpperCase('pt-BR') + p.slice(1)))
+    .map((original, i) => {
+      const nu = original.replace(/[.,]/g, '');
+      const semVogal = !/[AEIOUÁÉÍÓÚÂÊÔÃÕÀY]/iu.test(nu);
+      if (SIGLAS.has(nu) || (semVogal && nu.length >= 2 && !TITULOS.has(nu))) return original;
+      const p = original.toLocaleLowerCase('pt-BR');
+      return i > 0 && MINUSCULAS.has(p) ? p : p.charAt(0).toLocaleUpperCase('pt-BR') + p.slice(1);
+    })
     .join(' ');
 }
 

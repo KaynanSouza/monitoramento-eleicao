@@ -21,6 +21,8 @@ export interface OpcoesSimulador {
   duracaoMin?: number;
   /** Minutos simulados por minuto real. */
   velocidade?: number;
+  /** Minuto simulado em que o replay começa (0 = início da divulgação). */
+  inicioMin?: number;
   agoraReal?: () => number;
 }
 
@@ -52,6 +54,7 @@ export class Simulador {
   readonly velocidade: number;
   private readonly agoraReal: () => number;
   private readonly inicioReal: number;
+  private readonly inicioMin: number;
 
   constructor(
     private readonly dados: DadosReplay,
@@ -62,11 +65,12 @@ export class Simulador {
     this.velocidade = o.velocidade ?? 20;
     this.agoraReal = o.agoraReal ?? Date.now;
     this.inicioReal = this.agoraReal();
+    this.inicioMin = o.inicioMin ?? 0;
   }
 
   /** Instante simulado atual (epoch ms). Para no fim da apuração: depois disso nada muda. */
   agora(): number {
-    const decorrido = (this.agoraReal() - this.inicioReal) * this.velocidade;
+    const decorrido = this.inicioMin * MINUTO + (this.agoraReal() - this.inicioReal) * this.velocidade;
     return this.inicioSimulado + Math.min(decorrido, this.duracaoMin * MINUTO);
   }
 

@@ -8,4 +8,6 @@ export const config = {
   ciclo: process.env.EXPO_PUBLIC_TSE_CICLO ?? 'ele2026',
   mock: (process.env.EXPO_PUBLIC_MOCK === 'replay' ? 'replay' : 'off') as MockMode,
   replaySpeed: Number(process.env.EXPO_PUBLIC_REPLAY_SPEED ?? 20),
+  /** Minuto da apuração simulada em que o replay começa (0 = 17h). */
+  replayInicioMin: Number(process.env.EXPO_PUBLIC_REPLAY_INICIO_MIN ?? 0),
 } as const;

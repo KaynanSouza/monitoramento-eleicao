@@ -17,7 +17,7 @@ src/db/     SQLite: cache HTTP, histórico, ajustes
 src/historico/ série do gráfico de evolução (com lacunas)
 src/replay/ simulador de apuração (MOCK=replay)
 src/segundoPlano/ tarefa em segundo plano
-src/ui/     componentes                                  [fase 4+]
+src/ui/     componentes da tela (tema claro/escuro, lista, cabeçalho)
 scripts/    fetch-fixtures, build-geo
 fixtures/   arquivos REAIS do TSE (1º turno 2026)
 docs/       formato dos arquivos do TSE, PDFs de especificação
@@ -69,6 +69,11 @@ sem rede. Usa os arquivos finais reais (`src/replay/dados.json`, gerado por
 delas, então a curva nacional se mexe como na noite real. Os selos só aparecem
 em 100%. A velocidade padrão é `EXPO_PUBLIC_REPLAY_SPEED=20`: 5 h de apuração em
 15 min. O replay usa um banco separado (`apuracao-replay.db`).
+`EXPO_PUBLIC_REPLAY_INICIO_MIN` faz o replay começar mais tarde: `120` = 19h,
+`300` = apuração concluída, com os selos.
+
+Prévia de layout no navegador, sem celular: `npx expo start --web`, de preferência
+em modo replay. O `metro.config.js` adiciona os cabeçalhos que o expo-sqlite exige na web.
 
 ## Códigos do 2º turno
 

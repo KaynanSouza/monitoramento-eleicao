@@ -40,6 +40,12 @@ describe('formatação pt-BR', () => {
   it('nomes e iniciais', () => {
     expect(nomeProprio('ESCRITOR AUGUSTO CURY')).toBe('Escritor Augusto Cury');
     expect(nomeProprio('LUIZ INÁCIO LULA DA SILVA')).toBe('Luiz Inácio Lula da Silva');
+    expect(nomeProprio('ACM NETO')).toBe('ACM Neto');
+    expect(nomeProprio('RUI COSTA PIMENTA')).toBe('Rui Costa Pimenta');
+    expect(nomeProprio('ZÉ DA SILVA')).toBe('Zé da Silva');
+    expect(nomeProprio('DJ MARCOS DO MLB')).toBe('DJ Marcos do MLB');
+    expect(nomeProprio('DR. JOÃO JR')).toBe('Dr. João Jr');
+    expect(nomeProprio('SGT LÉO')).toBe('Sgt Léo');
     expect(iniciais('FLAVIO BOLSONARO')).toBe('FB');
     expect(iniciais('LULA')).toBe('L');
     expect(iniciais('RUI COSTA PIMENTA')).toBe('RP');

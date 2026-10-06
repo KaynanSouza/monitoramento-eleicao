@@ -1,54 +1,122 @@
-import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { formatDataHora, formatInteiro } from '@/lib/format';
-import { obterServicos } from '@/servicos';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Consulta } from '@/api/apuracao';
+import { nomeAbrangencia } from '@/lib/ufs';
+import type { Candidato } from '@/tse/types';
+import { AbasCargo, BarraSecoes, SeletorAbrangencia, SeloStatus } from '@/ui/Cabecalho';
+import { LinhaCandidato } from '@/ui/LinhaCandidato';
+import { mensagemErro } from '@/ui/mensagens';
+import { AvisosDados, Rodape } from '@/ui/Rodape';
+import { SeletorUf } from '@/ui/SeletorUf';
+import { useTema } from '@/ui/tema';
+import { useCargos, useResultado } from '@/ui/useApuracao';
 
-// Prévia provisória da fase 3 (verifica coletor, cache e histórico no aparelho).
-// A tela de apuração de verdade entra na fase 4.
+const TAG_TELA_LIGADA = 'apuracao';
+
 export default function Apuracao() {
-  const q = useQuery({
-    queryKey: ['previa', 1, '1', 'br'],
-    queryFn: async () => {
-      const s = await obterServicos();
-      const r = await s.apuracao.resultado({ turno: 1, cargo: '1', uf: 'br' });
-      const hist = await s.historico.listar({ eleicao: r.eleicao.codigo, cargo: '1', abrangencia: 'br' });
-      return { ...r, modo: s.modo, snapshots: hist.length };
-    },
-    refetchInterval: 15_000,
-  });
+  const t = useTema();
+  const [turno] = useState<1 | 2>(1); // seletor de turno: fase 5
+  const [cargo, setCargo] = useState<string | null>(null);
+  const [uf, setUf] = useState('br');
+  const [seletorAberto, setSeletorAberto] = useState(false);
+
+  const cargos = useCargos(turno);
+  const lista = cargos.data ?? [];
+  const cargoAtual = lista.find((c) => c.codigo === cargo) ?? lista[0];
+
+  // Cargos sem resultado nacional exigem uma UF.
+  const precisaUf = cargoAtual !== undefined && !cargoAtual.nacional && uf === 'br';
+  const consulta: Consulta | null = cargoAtual && !precisaUf ? { turno, cargo: cargoAtual.codigo, uf } : null;
+  const q = useResultado(consulta);
+  const dados = q.data;
+  const finalizada = dados?.resultado.totalizacaoFinal ?? false;
+
+  // Mantém a tela ligada enquanto a apuração estiver em andamento.
+  useEffect(() => {
+    if (finalizada || !consulta) return;
+    activateKeepAwakeAsync(TAG_TELA_LIGADA).catch(() => undefined);
+    return () => {
+      deactivateKeepAwake(TAG_TELA_LIGADA).catch(() => undefined);
+    };
+  }, [finalizada, consulta !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const candidatos: Candidato[] = consulta ? (dados?.resultado.candidatos ?? []) : [];
+
+  const cabecalho = useMemo(
+    () => (
+      <View style={styles.cabecalho}>
+        <SeloStatus resultado={consulta ? dados?.resultado : undefined} />
+        <SeletorAbrangencia nome={nomeAbrangencia(uf)} aoTocar={() => setSeletorAberto(true)} />
+        {cargos.error ? (
+          <Text style={[styles.erro, { color: t.erro }]}>{mensagemErro(cargos.error)}</Text>
+        ) : (
+          <AbasCargo cargos={lista} ativo={cargoAtual?.codigo ?? ''} aoEscolher={setCargo} />
+        )}
+        <AvisosDados dados={consulta ? dados : undefined} />
+        {precisaUf && (
+          <View style={[styles.vazio, { backgroundColor: t.superficie }]}>
+            <Text style={[styles.vazioTexto, { color: t.texto }]}>
+              {cargoAtual?.nome} não tem resultado nacional. Escolha um estado.
+            </Text>
+            <Pressable
+              onPress={() => setSeletorAberto(true)}
+              accessibilityRole="button"
+              style={[styles.botao, { backgroundColor: t.destaque }]}
+            >
+              <Text style={styles.botaoTexto}>Escolher estado</Text>
+            </Pressable>
+          </View>
+        )}
+        {consulta && q.error && !dados && (
+          <Text style={[styles.erro, { color: t.erro }]}>{mensagemErro(q.error)}</Text>
+        )}
+        {consulta && q.isPending && <ActivityIndicator style={styles.carregando} />}
+        {consulta && dados && <BarraSecoes resultado={dados.resultado} />}
+      </View>
+    ),
+    [consulta, dados, uf, lista, cargoAtual, cargos.error, precisaUf, q.error, q.isPending, t],
+  );
+
+  const recarregando = q.isRefetching && !q.isPending;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Apuração 2026</Text>
-      {q.isPending && <ActivityIndicator />}
-      {q.error && <Text style={styles.erro}>{(q.error as Error).message}</Text>}
-      {q.data && (
-        <View style={styles.bloco}>
-          <Text>
-            Modo {q.data.modo} · eleição {q.data.eleicao.codigo} · {q.data.origem} · {q.data.snapshots} snapshots
-          </Text>
-          <Text>
-            Seções: {q.data.resultado.secoes.pctTexto}% ({formatInteiro(q.data.resultado.secoes.totalizadas)} de{' '}
-            {formatInteiro(q.data.resultado.secoes.total)})
-          </Text>
-          <Text>Atualizado em {formatDataHora(q.data.resultado.atualizadoEm)}</Text>
-          {q.data.resultado.candidatos.slice(0, 5).map((c) => (
-            <Text key={c.sqcand}>
-              {c.nomeUrna} ({c.partido.sigla}) {c.pctTexto}% · {formatInteiro(c.votos)}
-              {c.situacao !== 'pendente' ? ` [${c.situacaoTexto}]` : ''}
-            </Text>
-          ))}
-        </View>
-      )}
-      <Text style={styles.fonte}>Fonte: TSE (divulgação oficial)</Text>
-    </ScrollView>
+    <SafeAreaView style={[styles.tela, { backgroundColor: t.fundo }]} edges={['top']}>
+      <FlatList
+        data={candidatos}
+        keyExtractor={(c) => c.sqcand}
+        renderItem={({ item }) => <LinhaCandidato candidato={item} foto={dados?.foto(item.sqcand) ?? null} />}
+        ListHeaderComponent={cabecalho}
+        ListFooterComponent={<Rodape dados={consulta ? dados : undefined} />}
+        refreshControl={
+          <RefreshControl refreshing={recarregando} onRefresh={() => q.refetch()} enabled={consulta !== null} />
+        }
+        initialNumToRender={12}
+        windowSize={7}
+        removeClippedSubviews
+      />
+      <SeletorUf
+        visivel={seletorAberto}
+        atual={uf}
+        incluirBrasil={cargoAtual?.nacional ?? true}
+        aoEscolher={(novo) => {
+          setUf(novo);
+          setSeletorAberto(false);
+        }}
+        aoFechar={() => setSeletorAberto(false)}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingTop: 64, gap: 12, backgroundColor: '#fff', flexGrow: 1 },
-  title: { fontSize: 28, fontWeight: '700' },
-  bloco: { gap: 4 },
-  erro: { color: '#B00020' },
-  fonte: { color: '#555', marginTop: 16 },
+  tela: { flex: 1 },
+  cabecalho: { padding: 16, gap: 16 },
+  erro: { fontSize: 15 },
+  carregando: { marginVertical: 24 },
+  vazio: { padding: 16, borderRadius: 8, gap: 12, alignItems: 'flex-start' },
+  vazioTexto: { fontSize: 16 },
+  botao: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  botaoTexto: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
 });

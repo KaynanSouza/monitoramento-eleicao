@@ -70,6 +70,10 @@ export class ServicoApuracao {
     this.intervaloSegurancaMs = d.intervaloSegurancaMs ?? 5 * MINUTO;
   }
 
+  get endpoint(): TseEndpoint {
+    return this.d.endpoint;
+  }
+
   private get urls() {
     return criarUrls(this.d.endpoint);
   }
