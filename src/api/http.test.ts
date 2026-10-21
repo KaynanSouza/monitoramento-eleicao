@@ -130,6 +130,40 @@ describe('TseHttp', () => {
     expect(chamadas).toHaveLength(1);
   });
 
+  it('corpo truncado ou HTML com 200 não entra no cache: mantém o último corpo bom', async () => {
+    const rel = { t: 0 };
+    let corpo = '{"a":1}';
+    const NOVA = 'https://tse/nova.json';
+    const { fetchFn } = servidor({
+      [U]: () => ok(corpo, corpo === '{"a":1}' ? '"v1"' : '"v2"')(),
+      [NOVA]: ok('<html>erro</html>'),
+    });
+    const http = cliente(fetchFn, rel);
+    await http.buscar(U);
+    corpo = '{"a":1, "b":[1,2';
+    rel.t = 60_000;
+    const r = await http.buscar(U);
+    expect(r.origem).toBe('offline');
+    expect(r.corpo).toBe('{"a":1}');
+    expect((await http.espiar(U))?.etag).toBe('"v1"');
+    await expect(http.buscar(NOVA)).rejects.toBeInstanceOf(SemDadosError);
+  });
+
+  it('falha ao ler o corpo vira offline em vez de erro cru', async () => {
+    const rel = { t: 0 };
+    let quebrar = false;
+    const fetchFn = (async () => {
+      const r = ok('{"a":1}')();
+      if (quebrar) r.text = () => Promise.reject(new TypeError('connection reset'));
+      return r;
+    }) as typeof fetch;
+    const http = cliente(fetchFn, rel);
+    await http.buscar(U);
+    quebrar = true;
+    rel.t = 60_000;
+    expect((await http.buscar(U)).origem).toBe('offline');
+  });
+
   it('grava o marcador informado', async () => {
     const rel = { t: 0 };
     const { fetchFn } = servidor({ [U]: ok('{"a":1}') });
@@ -154,6 +188,23 @@ describe('Limitador', () => {
       ),
     );
     expect(pico).toBe(2);
+  });
+
+  it('a vaga liberada vai para quem espera: chamada nova não fura a fila', async () => {
+    const lim = new Limitador(1, 0);
+    let ativos = 0;
+    let pico = 0;
+    const tarefa = async () => {
+      pico = Math.max(pico, ++ativos);
+      await new Promise((r) => setTimeout(r, 5));
+      ativos--;
+    };
+    const a = lim.executar(tarefa);
+    const b = lim.executar(tarefa); // fica na fila
+    // Assim que `a` termina (antes de `b` acordar), chega outra chamada.
+    const c = a.then(() => lim.executar(tarefa));
+    await Promise.all([a, b, c]);
+    expect(pico).toBe(1);
   });
 
   it('espaça os inícios', async () => {

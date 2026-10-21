@@ -30,7 +30,7 @@ export const LinhaCandidato = memo(function LinhaCandidato({ candidato: c, foto 
           <Text style={[styles.nome, { color: t.texto }]} numberOfLines={1}>
             {nome}
           </Text>
-          <SeloSituacao situacao={c.situacao} />
+          <SeloSituacao situacao={c.situacao} texto={c.situacaoTexto} />
         </View>
         <View style={styles.topo}>
           <Text style={[styles.numero, { color: t.textoSecundario }]}>{c.numero}</Text>

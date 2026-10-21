@@ -1,9 +1,10 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { Consulta, ResultadoApuracao } from '@/api/apuracao';
 import { obterServicos } from '@/servicos';
-import { cargosDisponiveis } from '@/tse/eleicoes';
+import { cargosDisponiveis, ehCargoNacional } from '@/tse/eleicoes';
 import { criarUrls } from '@/tse/urls';
-import { montarSerie } from '@/historico/serie';
+import { snapshotsPrimeiroTurno } from '@/historico/primeiroTurno';
+import { janelaDoDia, montarSerie } from '@/historico/serie';
 
 /** Intervalo de atualização da tela. O cliente HTTP garante o mínimo de 45 s por arquivo. */
 const INTERVALO_MS = 30_000;
@@ -28,7 +29,8 @@ export function useResultado(consulta: Consulta | null) {
   return useQuery({
     queryKey: ['resultado', consulta?.turno, consulta?.cargo, consulta?.uf],
     enabled: consulta !== null,
-    placeholderData: keepPreviousData,
+    // Sem placeholder: ao trocar UF/cargo/turno, os números da consulta anterior não podem
+    // aparecer sob o título novo. O refetch da mesma consulta já mantém os dados na tela.
     queryFn: async (): Promise<DadosTela> => {
       const s = await obterServicos();
       const r = await s.apuracao.resultado(consulta!);
@@ -37,7 +39,8 @@ export function useResultado(consulta: Consulta | null) {
       // Fotos só para cargos majoritários (poucos candidatos); proporcionais usam iniciais
       // para não disparar milhares de requisições ao TSE.
       const comFoto = s.modo === 'oficial' && r.resultado.cargo.vagas <= 2;
-      const pastaFoto = consulta!.uf === 'br' ? 'br' : consulta!.uf;
+      // As fotos de Presidente só existem em fotos/br/ (fotos/sp/... dá 404), mesmo vendo uma UF.
+      const pastaFoto = ehCargoNacional(r.resultado.cargo.nome) ? 'br' : consulta!.uf;
       return {
         ...r,
         modo: s.modo,
@@ -90,7 +93,23 @@ export function useHistorico(consulta: Consulta | null, eleicao: string | undefi
     queryFn: async () => {
       const s = await obterServicos();
       const snaps = await s.historico.listar({ eleicao: eleicao!, cargo: consulta!.cargo, abrangencia: consulta!.uf });
-      return montarSerie(snaps, { maxCandidatos: consulta!.turno === 2 ? 2 : 5 });
+      // Só o dia da votação: o TSE regera os arquivos dias depois (reprocessamentos) e cada
+      // abertura do app gravaria um ponto novo, esticando o eixo por vários dias.
+      // No replay o horário é simulado (sempre 04/10), então vale o dia da primeira totalização.
+      const data =
+        s.modo === 'oficial'
+          ? (await s.apuracao.eleicoes().catch(() => [])).find((e) => e.codigo === eleicao)?.data
+          : undefined;
+      const janela = janelaDoDia(data ?? snaps.find((x) => x.atualizadoEm)?.atualizadoEm ?? null);
+      const maxCandidatos = consulta!.turno === 2 ? 2 : 5;
+      const gravada = montarSerie(snaps, { maxCandidatos, janela });
+      // 1º turno sem gravação ao vivo (app instalado depois de 04/10): usa a reconstrução
+      // a partir dos arquivos do TSE. O 2º turno é sempre o que o app gravar no dia.
+      if (gravada.segmentos.length || consulta!.turno !== 1 || s.modo !== 'oficial') return gravada;
+      const reconstruida = snapshotsPrimeiroTurno(eleicao!, consulta!.cargo, consulta!.uf);
+      return reconstruida
+        ? montarSerie(reconstruida, { maxCandidatos, lacunaMs: Infinity, origem: 'reconstruido' })
+        : gravada;
     },
   });
 }

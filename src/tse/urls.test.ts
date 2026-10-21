@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lerFixture } from '@/test/fixtures';
-import { cargosDisponiveis, resolverEleicao } from './eleicoes';
+import { cargoNaAbrangencia, cargosDisponiveis, resolverEleicao } from './eleicoes';
 import { normalizarEleicoes, normalizarMunicipios } from './normalize';
 import { criarUrls, IndiceMunicipios, UrlInvalidaError } from './urls';
 
@@ -98,8 +98,18 @@ describe('resolverEleicao', () => {
       { codigo: '3', nome: 'Governador', nacional: false },
       { codigo: '5', nome: 'Senador', nacional: false },
       { codigo: '6', nome: 'Deputado Federal', nacional: false },
+      { codigo: '7', nome: 'Deputado Estadual', nacional: false },
+      { codigo: '8', nome: 'Deputado Distrital', nacional: false },
     ]);
     expect(cargosDisponiveis(eleicoes, 2).map((c) => c.nome)).toEqual(['Presidente', 'Governador']);
+  });
+
+  it('Dep. Estadual fora do DF, Dep. Distrital só no DF', () => {
+    const cargos = cargosDisponiveis(eleicoes, 1);
+    const nomes = (uf: string) => cargos.filter((c) => cargoNaAbrangencia(c, uf)).map((c) => c.codigo);
+    expect(nomes('sp')).toEqual(['1', '3', '5', '6', '7']);
+    expect(nomes('df')).toEqual(['1', '3', '5', '6', '8']);
+    expect(nomes('br')).toEqual(['1', '3', '5', '6', '7']);
   });
 
   it('cargo inexistente', () => {

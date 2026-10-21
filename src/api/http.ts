@@ -160,8 +160,16 @@ export class TseHttp {
       return this.resposta(nova, 'nao-modificado');
     }
     if (res.status === 200) {
+      let corpo: string;
+      try {
+        corpo = await res.text();
+      } catch (e) {
+        return this.semRede(url, entrada, e instanceof Error ? e.message : 'falha ao ler a resposta');
+      }
+      // Corpo truncado ou página de erro da CDN com status 200: nunca entra no cache
+      // (gravado com o ETag, viraria 304 para sempre). Mantém o último corpo bom.
+      if (!pareceJson(corpo)) return this.semRede(url, entrada, 'resposta incompleta do TSE');
       this.backoffAtualMs = 0;
-      const corpo = await res.text();
       const nova: EntradaCache = {
         url,
         status: 200,
@@ -227,4 +235,13 @@ export class TseHttp {
       marcador: e.marcador,
     };
   }
+}
+
+/**
+ * Checagem barata (sem parse) de que o corpo é um JSON completo: todos os arquivos
+ * da divulgação são objetos JSON. Pega truncamento e páginas HTML de erro.
+ */
+export function pareceJson(corpo: string): boolean {
+  const s = corpo.trim();
+  return (s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'));
 }

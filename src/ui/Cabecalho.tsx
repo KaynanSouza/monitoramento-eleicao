@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { formatInteiro } from '@/lib/format';
 import type { CargoDisponivel } from '@/tse/eleicoes';
 import type { Resultado } from '@/tse/types';
@@ -46,7 +46,11 @@ export function SeletorAbrangencia({ nome, aoTocar }: { nome: string; aoTocar: (
   );
 }
 
-const ROTULOS: Record<string, string> = { 'Deputado Federal': 'Dep. Federal' };
+const ROTULOS: Record<string, string> = {
+  'Deputado Federal': 'Dep. Federal',
+  'Deputado Estadual': 'Dep. Estadual',
+  'Deputado Distrital': 'Dep. Distrital',
+};
 
 export function AbasCargo({
   cargos,
@@ -59,7 +63,14 @@ export function AbasCargo({
 }) {
   const t = useTema();
   return (
-    <View style={[styles.abas, { borderBottomColor: t.borda }]} accessibilityRole="tablist">
+    // Rolável: com Dep. Estadual/Distrital são 5 abas, que não cabem em telas estreitas.
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={[styles.abas, { borderBottomColor: t.borda }]}
+      contentContainerStyle={styles.abasConteudo}
+      accessibilityRole="tablist"
+    >
       {cargos.map((c) => {
         const sel = c.codigo === ativo;
         return (
@@ -80,7 +91,7 @@ export function AbasCargo({
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -123,8 +134,16 @@ const styles = StyleSheet.create({
   abrangencia: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
   abrangenciaTexto: { fontSize: 34, fontWeight: '800' },
   seta: { fontSize: 22 },
-  abas: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
-  aba: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  abas: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  abasConteudo: { flexGrow: 1 },
+  aba: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
   abaTexto: { fontSize: 14 },
   abaAtiva: { fontWeight: '800' },
   secoes: { gap: 6 },

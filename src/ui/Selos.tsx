@@ -15,7 +15,7 @@ export function SeloPartido({ numero, sigla }: { numero: string; sigla: string }
 }
 
 /** Selo de situação: só "2º Turno" e "Eleito", e só quando o arquivo do TSE indica. */
-export function SeloSituacao({ situacao }: { situacao: Situacao }) {
+export function SeloSituacao({ situacao, texto }: { situacao: Situacao; texto?: string }) {
   const t = useTema();
   if (situacao === 'segundo_turno') {
     return (
@@ -27,7 +27,10 @@ export function SeloSituacao({ situacao }: { situacao: Situacao }) {
   if (situacao === 'eleito') {
     return (
       <View style={[styles.selo, { backgroundColor: t.eleito }]}>
-        <Text style={[styles.texto, { color: t.eleitoTexto }]}>Eleito</Text>
+        <Text style={[styles.texto, { color: t.eleitoTexto }]}>
+          {/* Proporcionais: "Eleito por média" (sobras) é informação relevante; QP vira só "Eleito". */}
+          {texto && /m[ée]dia/i.test(texto) ? 'Eleito por média' : 'Eleito'}
+        </Text>
       </View>
     );
   }

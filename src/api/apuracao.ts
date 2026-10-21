@@ -11,10 +11,12 @@
 import type { RepositorioAjustes, RepositorioHistorico, Snapshot } from '@/db/sql';
 import { type EleicaoResolvida, resolverEleicao } from '@/tse/eleicoes';
 import {
+  lerJson,
   normalizarAcompanhamento,
   normalizarEleicoes,
   normalizarMunicipios,
   normalizarResultado,
+  TseFormatoError,
 } from '@/tse/normalize';
 import type { Acompanhamento, EleicaoMeta, MunicipiosConfig, Resultado } from '@/tse/types';
 import { criarUrls, IndiceMunicipios, type TseEndpoint } from '@/tse/urls';
@@ -59,6 +61,8 @@ export interface DepsApuracao {
 }
 
 const MINUTO = 60_000;
+/** Buscas de município simultâneas no mapa (o limitador global ainda vale). */
+const TRABALHADORES_MAPA = 4;
 
 export class ServicoApuracao {
   private readonly agora: () => number;
@@ -80,7 +84,7 @@ export class ServicoApuracao {
 
   async eleicoes(): Promise<EleicaoMeta[]> {
     const r = await this.d.http.buscar(this.urls.eleicoesConfig(), { intervaloMinimoMs: 10 * MINUTO });
-    return normalizarEleicoes(JSON.parse(r.corpo), this.d.endpoint.ciclo, 'ele-c.json');
+    return normalizarEleicoes(lerJson(r.corpo, 'ele-c.json'), this.d.endpoint.ciclo, 'ele-c.json');
   }
 
   async resolver(turno: 1 | 2, cargo: string): Promise<EleicaoResolvida | null> {
@@ -93,7 +97,7 @@ export class ServicoApuracao {
     const memo = this.municipiosCache.get(eleicao);
     if (memo) return memo;
     const r = await this.d.http.buscar(url, { intervaloMinimoMs: 6 * 60 * MINUTO });
-    const cfg = normalizarMunicipios(JSON.parse(r.corpo), url);
+    const cfg = normalizarMunicipios(lerJson(r.corpo, url), url);
     const v = { cfg, indice: new IndiceMunicipios(cfg) };
     this.municipiosCache.set(eleicao, v);
     return v;
@@ -104,9 +108,10 @@ export class ServicoApuracao {
     const url = criarUrls(this.d.endpoint, await this.indiceOuNada(eleicao)).acompanhamento(eleicao, uf);
     try {
       const r = await this.d.http.buscar(url);
-      return normalizarAcompanhamento(JSON.parse(r.corpo), url);
+      return normalizarAcompanhamento(lerJson(r.corpo, url), url);
     } catch (e) {
-      if (e instanceof NaoEncontradoError || e instanceof SemDadosError) return null;
+      // O acompanhamento só decide o que rebaixar: se vier quebrado, segue sem marcador.
+      if (e instanceof NaoEncontradoError || e instanceof SemDadosError || e instanceof TseFormatoError) return null;
       throw e;
     }
   }
@@ -120,7 +125,7 @@ export class ServicoApuracao {
     const acomp = await this.acompanhamento(eleicao.codigo, 'br');
     const marcador = marcadorDe(acomp, q.uf === 'br' ? 'br' : 'uf', q.uf);
     const resp = await this.buscarComMarcador(url, marcador);
-    const resultado = normalizarResultado(JSON.parse(resp.corpo), url, q.cargo);
+    const resultado = normalizarResultado(lerJson(resp.corpo, url), url, q.cargo);
 
     await this.registrarSnapshot(q, eleicao.codigo, resultado, resp, opcoes.segundoPlano ?? false);
     return { resultado, eleicao, origem: resp.origem, verificadoEm: resp.verificadoEm };
@@ -132,7 +137,7 @@ export class ServicoApuracao {
     const url = criarUrls(this.d.endpoint, indice).resultadoMunicipio(eleicao.codigo, q.cargo, q.uf, municipioTse);
     const acomp = await this.acompanhamento(eleicao.codigo, q.uf);
     const resp = await this.buscarComMarcador(url, marcadorDe(acomp, 'mun', municipioTse));
-    const resultado = normalizarResultado(JSON.parse(resp.corpo), url, q.cargo);
+    const resultado = normalizarResultado(lerJson(resp.corpo, url), url, q.cargo);
     return { resultado, eleicao, origem: resp.origem, verificadoEm: resp.verificadoEm };
   }
 
@@ -158,21 +163,25 @@ export class ServicoApuracao {
     );
     const lista = (cfg.ufs.find((u) => u.uf === q.uf)?.municipios ?? []).filter((m) => totalizados.has(m.tse));
     let feitos = 0;
+    let proximo = 0;
 
-    await Promise.all(
-      lista.map(async (m) => {
-        if (opcoes.sinal?.aborted) return;
+    // Poucos "trabalhadores" puxando da lista (em vez de enfileirar tudo de uma vez no
+    // limitador): assim o cancelamento (tela fechada, UF trocada) para as buscas restantes.
+    const trabalhador = async () => {
+      while (proximo < lista.length && !opcoes.sinal?.aborted) {
+        const m = lista[proximo++]!;
         const url = urls.resultadoMunicipio(eleicao.codigo, q.cargo, q.uf, m.tse);
         try {
           const resp = await this.buscarComMarcador(url, marcadorDe(acomp, 'mun', m.tse));
-          saida.set(m.ibge, normalizarResultado(JSON.parse(resp.corpo), url, q.cargo));
+          saida.set(m.ibge, normalizarResultado(lerJson(resp.corpo, url), url, q.cargo));
         } catch {
           // ainda não publicado / offline sem cache: fica fora do mapa
         } finally {
           opcoes.aoProgredir?.(++feitos, lista.length);
         }
-      }),
-    );
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(TRABALHADORES_MAPA, lista.length) }, trabalhador));
     return saida;
   }
 
@@ -235,7 +244,7 @@ export class ServicoApuracao {
   private async registrarSnapshot(q: Consulta, eleicao: string, r: Resultado, resp: Resposta, segundoPlano: boolean) {
     if (!this.d.historico || resp.origem === 'offline') return;
     // Histórico só para cargos majoritários (evolução de poucos candidatos).
-    if (r.cargo.vagas > 2 || r.candidatos.length > 60) return;
+    if (r.proporcional || r.candidatos.length > 60) return;
     const s: Snapshot = {
       eleicao,
       turno: q.turno,

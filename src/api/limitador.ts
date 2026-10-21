@@ -25,9 +25,12 @@ export class Limitador {
 
   async executar<T>(tarefa: () => Promise<T>): Promise<T> {
     if (this.ativos >= this.concorrencia) {
+      // A vaga é repassada diretamente por quem termina (ver finally): `ativos` não cai
+      // entre a liberação e o despertar, então nenhuma chamada nova "fura" a fila.
       await new Promise<void>((r) => this.fila.push(r));
+    } else {
+      this.ativos++;
     }
-    this.ativos++;
     try {
       const inicio = Math.max(this.agora(), this.proximoInicio);
       this.proximoInicio = inicio + this.espacamentoMs;
@@ -35,8 +38,9 @@ export class Limitador {
       if (espera > 0) await this.esperar(espera);
       return await tarefa();
     } finally {
-      this.ativos--;
-      this.fila.shift()?.();
+      const proximo = this.fila.shift();
+      if (proximo) proximo();
+      else this.ativos--;
     }
   }
 }

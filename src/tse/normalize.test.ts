@@ -5,6 +5,7 @@ import {
   normalizarAcompanhamento,
   normalizarEleicoes,
   normalizarMunicipios,
+  lerJson,
   normalizarResultado,
   TseFormatoError,
 } from './normalize';
@@ -184,5 +185,55 @@ describe('erro amigável quando o formato diverge', () => {
       expect((e as TseFormatoError).message).toMatch(/formato inesperado/);
       expect((e as TseFormatoError).detalhes).toMatch(/^s\./);
     }
+  });
+});
+
+describe('cargos proporcionais (bancada por agremiação)', () => {
+  it('Dep. Federal SP: vagas do TSE somam 70 e batem com os eleitos de cada agremiação', () => {
+    const arq = 'oficial/ele2026/6259/dados/sp/sp-c0006-e006259-u.json';
+    const r = normalizarResultado(lerFixture(arq), arq);
+    const p = r.proporcional!;
+    expect(p.quocienteEleitoral).toBe(338203);
+    expect(p.agremiacoes.reduce((s, a) => s + (a.vagas ?? 0), 0)).toBe(70);
+    expect(p.agremiacoes[0]).toMatchObject({ composicao: 'PL', vagas: 19, principal: { numero: '22', sigla: 'PL' } });
+    const fe = p.agremiacoes.find((a) => a.composicao === 'PCDOB / PT / PV')!;
+    expect(fe).toMatchObject({ tipo: 'federacao', vagas: 11, principal: { sigla: 'PT' } });
+    const eleitosFe = r.candidatos.filter((c) => c.situacao === 'eleito' && ['13', '43', '65'].includes(c.partido.numero));
+    expect(eleitosFe).toHaveLength(11);
+  });
+
+  it('DF sem totais na agremiação: soma os partidos', () => {
+    const arq = 'oficial/ele2026/6259/dados/df/df-c0006-e006259-u.json';
+    const p = normalizarResultado(lerFixture(arq), arq).proporcional!;
+    expect(p.agremiacoes.reduce((s, a) => s + (a.vagas ?? 0), 0)).toBe(8);
+    for (const a of p.agremiacoes) {
+      expect(a.votos).toBe(a.partidos.reduce((s, x) => s + x.votosNominais + x.votosLegenda, 0));
+    }
+  });
+
+  it('em reprocessamento (vag="0" em todas): vagas ainda não distribuídas', () => {
+    const arq = 'oficial/ele2026/6259/dados/pe/pe-c0006-e006259-u.json';
+    const p = normalizarResultado(lerFixture(arq), arq).proporcional!;
+    expect(p.agremiacoes.every((a) => a.vagas === null)).toBe(true);
+  });
+
+  it('Dep. Estadual SP e Dep. Distrital DF', () => {
+    for (const [arq, vagas] of [
+      ['oficial/ele2026/6259/dados/sp/sp-c0007-e006259-u.json', 94],
+      ['oficial/ele2026/6259/dados/df/df-c0008-e006259-u.json', 24],
+    ] as const) {
+      const r = normalizarResultado(lerFixture(arq), arq);
+      expect(r.cargo.vagas).toBe(vagas);
+      expect(r.proporcional!.agremiacoes.reduce((s, a) => s + (a.vagas ?? 0), 0)).toBe(vagas);
+    }
+  });
+
+  it('majoritários não têm bloco proporcional (Senador tem 2 vagas, mas sem quociente)', () => {
+    const arq = 'oficial/ele2026/6259/dados/sp/sp-c0005-e006259-u.json';
+    expect(normalizarResultado(lerFixture(arq), arq).proporcional).toBeNull();
+  });
+
+  it('JSON inválido vira TseFormatoError', () => {
+    expect(() => lerJson('{"a":', 'x.json')).toThrow(TseFormatoError);
   });
 });

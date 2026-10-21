@@ -156,4 +156,22 @@ describe('ServicoApuracao (fixtures reais via fetch falso)', () => {
     expect(progresso.at(-1)).toBe(22);
     expect(srv.chamadas.some((u) => /ac\d{5}-c0001/.test(u) && !u.includes('-e006257-'))).toBe(false);
   });
+
+  it('municípios: cancelar (tela fechada) para as buscas que ainda não começaram', async () => {
+    const { apuracao, srv } = await montar();
+    const ctrl = new AbortController();
+    await apuracao.carregarMunicipios(
+      { turno: 1, cargo: '1', uf: 'ac' },
+      { sinal: ctrl.signal, aoProgredir: (f) => f === 2 && ctrl.abort() },
+    );
+    const municipais = srv.chamadas.filter((u) => /\/ac\d{5}-c0001/.test(u)).length;
+    expect(municipais).toBeGreaterThan(0);
+    expect(municipais).toBeLessThan(10);
+  });
+
+  it('Dep. Federal SP: bancada oficial por agremiação', async () => {
+    const { apuracao } = await montar();
+    const { resultado: r } = await apuracao.resultado({ turno: 1, cargo: '6', uf: 'sp' });
+    expect(r.proporcional?.agremiacoes.reduce((s, a) => s + (a.vagas ?? 0), 0)).toBe(70);
+  });
 });

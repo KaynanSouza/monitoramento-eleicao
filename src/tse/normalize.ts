@@ -9,9 +9,11 @@ import {
 } from './schemas';
 import type {
   Acompanhamento,
+  Agremiacao,
   Candidato,
   EleicaoMeta,
   MunicipiosConfig,
+  Proporcional,
   Resultado,
   Situacao,
 } from './types';
@@ -37,6 +39,15 @@ function validar<S extends z.ZodType>(schema: S, json: unknown, arquivo: string)
     throw new TseFormatoError(arquivo, detalhes);
   }
   return r.data;
+}
+
+/** JSON.parse que falha como TseFormatoError (mensagem amigável) em vez de SyntaxError. */
+export function lerJson(corpo: string, arquivo: string): unknown {
+  try {
+    return JSON.parse(corpo);
+  } catch (e) {
+    throw new TseFormatoError(arquivo, e instanceof Error ? e.message : 'JSON inválido');
+  }
 }
 
 const turno = (t: string): 1 | 2 => (t === '2' ? 2 : 1);
@@ -83,6 +94,48 @@ function candidatos(cargo: ResultadoRaw['carg'][number]): Candidato[] {
   return lista.map(({ seq: _seq, ...c }) => c);
 }
 
+const TIPOS_AGREMIACAO = { i: 'isolado', c: 'coligacao', f: 'federacao' } as const;
+
+/** Cargo proporcional = o arquivo traz o quociente eleitoral (`qe`). Senador (2 vagas) não traz. */
+function proporcional(cargo: ResultadoRaw['carg'][number]): Proporcional | null {
+  if (cargo.qe === undefined) return null;
+  const agremiacoes: Agremiacao[] = cargo.agr.map((a) => {
+    const partidos = a.par.map((p) => ({
+      numero: p.n,
+      sigla: p.sg,
+      votosNominais: parseInteiro(p.tvtn),
+      votosLegenda: parseInteiro(p.tvtl),
+    }));
+    const soma = (k: 'votosNominais' | 'votosLegenda') => partidos.reduce((s, p) => s + p[k], 0);
+    const votosNominais = a.tvtn !== undefined ? parseInteiro(a.tvtn) : soma('votosNominais');
+    const votosLegenda = a.tvtl !== undefined ? parseInteiro(a.tvtl) : soma('votosLegenda');
+    const principal = partidos.reduce<(typeof partidos)[number] | undefined>(
+      (m, p) => (!m || p.votosNominais + p.votosLegenda > m.votosNominais + m.votosLegenda ? p : m),
+      undefined,
+    );
+    return {
+      numero: a.n,
+      nome: a.nm.trim(),
+      tipo: TIPOS_AGREMIACAO[a.tp],
+      composicao: a.com,
+      principal: { numero: principal?.numero ?? '', sigla: principal?.sigla ?? a.com },
+      vagas: a.vag?.trim() ? parseInteiro(a.vag) : null,
+      votosNominais,
+      votosLegenda,
+      votos: votosNominais + votosLegenda,
+      partidos,
+    };
+  });
+  // Antes do fim da totalização o TSE manda vag="0" em todas: vagas ainda não distribuídas.
+  if (!agremiacoes.some((a) => (a.vagas ?? 0) > 0)) for (const a of agremiacoes) a.vagas = null;
+  agremiacoes.sort((x, y) => (y.vagas ?? 0) - (x.vagas ?? 0) || y.votos - x.votos);
+  return {
+    quocienteEleitoral: cargo.qe.trim() ? parseInteiro(cargo.qe) : null,
+    votosLegenda: agremiacoes.reduce((s, a) => s + a.votosLegenda, 0),
+    agremiacoes,
+  };
+}
+
 /**
  * EA20 → Resultado. Um arquivo "-u.json" traz um único cargo; se vier mais de um,
  * use `codigoCargo` para escolher.
@@ -122,6 +175,7 @@ export function normalizarResultado(json: unknown, arquivo = 'resultado', codigo
       anuladosSubJudice: parseInteiro(raw.v.vansj),
     },
     candidatos: candidatos(cargo),
+    proporcional: proporcional(cargo),
   };
 }
 

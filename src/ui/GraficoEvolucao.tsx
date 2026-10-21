@@ -146,7 +146,9 @@ export function GraficoEvolucao({ serie, finalizada }: Props) {
           </View>
 
           <Text style={[styles.nota, { color: t.textoSecundario }]}>
-            Histórico gravado a partir de {formatHora(iso(serie!.segmentos[0]![0]!.t))}, quando o app foi aberto.
+            {serie!.origem === 'reconstruido'
+              ? 'Reconstruído com os arquivos oficiais do TSE: cada município entra no gráfico no horário em que terminou de ser apurado.'
+              : `Histórico gravado a partir de ${formatHora(iso(serie!.segmentos[0]![0]!.t))}, quando o app foi aberto.`}
             {serie!.segmentos.length > 1 ? ' Trechos tracejados: período em que o app não acompanhou a apuração.' : ''}
             {' '}Toque no gráfico para ver os valores.
           </Text>

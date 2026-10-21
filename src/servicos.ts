@@ -25,7 +25,11 @@ export interface Servicos {
 let instancia: Promise<Servicos> | null = null;
 
 export function obterServicos(): Promise<Servicos> {
-  instancia ??= criar();
+  // Uma falha ao abrir/migrar o banco não pode ficar memorizada: a próxima chamada tenta de novo.
+  instancia ??= criar().catch((e: unknown) => {
+    instancia = null;
+    throw e;
+  });
   // Só em desenvolvimento: acesso pelo console para diagnóstico.
   if (__DEV__) (globalThis as { __servicos?: Promise<Servicos> }).__servicos = instancia;
   return instancia;

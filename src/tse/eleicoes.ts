@@ -28,9 +28,26 @@ export interface CargoDisponivel {
   nacional: boolean;
 }
 
-/** Cargos exibidos como abas (na ordem do ele-c). Os demais (Dep. Estadual etc.) ficam fora. */
-const CARGOS_EXIBIDOS = /^(presidente|governador|senador|deputado federal)$/i;
+/** Cargos exibidos como abas (na ordem do ele-c). Os demais (Conselheiro Distrital, consultas) ficam fora. */
+const CARGOS_EXIBIDOS = /^(presidente|governador|senador|deputado (federal|estadual|distrital))$/i;
 const CARGOS_NACIONAIS = /^presidente$/i;
+
+/** Cargo com resultado nacional (Presidente): fotos e arquivos ficam na pasta "br". */
+export function ehCargoNacional(nome: string): boolean {
+  return CARGOS_NACIONAIS.test(nome.trim());
+}
+
+/**
+ * O DF elege deputados distritais em vez de estaduais: Dep. Estadual não existe no DF
+ * (o arquivo dá 404) e Dep. Distrital só existe lá. Em "br" ambos aparecem, e a tela
+ * pede um estado como para os demais cargos não nacionais.
+ */
+export function cargoNaAbrangencia(c: CargoDisponivel, uf: string): boolean {
+  if (uf === 'br') return !/distrital/i.test(c.nome);
+  if (/^deputado distrital$/i.test(c.nome)) return uf === 'df';
+  if (/^deputado estadual$/i.test(c.nome)) return uf !== 'df';
+  return true;
+}
 
 /**
  * Cargos disponíveis no turno, derivados do ele-c.json. No 2º turno ainda não

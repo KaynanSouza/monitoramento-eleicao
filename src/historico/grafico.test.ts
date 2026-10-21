@@ -7,6 +7,7 @@ const T0 = Date.parse('2026-10-25T17:00:00-03:00');
 const area: Area = { largura: 340, altura: 240, margem: { esq: 40, dir: 0, topo: 0, base: 40 } };
 
 const serie: SerieEvolucao = {
+  origem: 'gravado',
   gravadoDesde: T0,
   candidatos: [
     { sqcand: 'a', numero: '22', nomeUrna: 'A', partido: '22', sigla: 'PL' },
@@ -41,7 +42,7 @@ describe('geometria do gráfico', () => {
   });
 
   it('série vazia → sem escalas', () => {
-    expect(escalas({ gravadoDesde: null, candidatos: [], segmentos: [] }, area)).toBeNull();
+    expect(escalas({ origem: 'gravado', gravadoDesde: null, candidatos: [], segmentos: [] }, area)).toBeNull();
   });
 
   it('caminho por segmento e ligação tracejada na lacuna', () => {

@@ -26,6 +26,8 @@ export interface SerieCandidato {
 }
 
 export interface SerieEvolucao {
+  /** "gravado" = observado ao vivo pelo app; "reconstruido" = 1º turno, montado dos arquivos do TSE. */
+  origem: 'gravado' | 'reconstruido';
   /** Primeira observação gravada (epoch ms do celular), para "histórico gravado a partir de HH:MM". */
   gravadoDesde: number | null;
   /** Candidatos na ordem do último snapshot. */
@@ -34,14 +36,53 @@ export interface SerieEvolucao {
   segmentos: PontoSerie[][];
 }
 
+export interface Janela {
+  /** epoch ms, inclusivo */
+  inicio: number;
+  /** epoch ms, exclusivo */
+  fim: number;
+}
+
+const HORA = 3_600_000;
+
+/**
+ * Janela do dia da votação no horário de Brasília: 00h do dia até 06h do dia seguinte
+ * (a apuração pode passar da meia-noite). Aceita "dd/mm/aaaa" (ele-c) ou ISO −03:00.
+ * Null se a data for inválida (aí a série não é filtrada).
+ */
+export function janelaDoDia(data: string | null): Janela | null {
+  if (!data) return null;
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(data);
+  let dia: string | null = br ? `${br[3]}-${br[2]}-${br[1]}` : null;
+  if (!dia) {
+    const ms = Date.parse(data);
+    if (Number.isNaN(ms)) return null;
+    dia = new Date(ms - 3 * HORA).toISOString().slice(0, 10); // dia em Brasília
+  }
+  const inicio = Date.parse(`${dia}T00:00:00-03:00`);
+  return Number.isNaN(inicio) ? null : { inicio, fim: inicio + 30 * HORA };
+}
+
 export function montarSerie(
   snapshots: Snapshot[],
-  opcoes: { lacunaMs?: number; maxCandidatos?: number } = {},
+  opcoes: {
+    lacunaMs?: number;
+    maxCandidatos?: number;
+    janela?: Janela | null;
+    origem?: SerieEvolucao['origem'];
+  } = {},
 ): SerieEvolucao {
   const lacunaMs = opcoes.lacunaMs ?? 3 * 60_000;
-  const ordenados = [...snapshots].sort((a, b) => a.capturadoEm - b.capturadoEm);
+  const j = opcoes.janela;
+  const noDia = (s: Snapshot) => {
+    if (!j) return true;
+    const t = s.atualizadoEm ? Date.parse(s.atualizadoEm) : NaN;
+    return !Number.isNaN(t) && t >= j.inicio && t < j.fim;
+  };
+  const ordenados = snapshots.filter(noDia).sort((a, b) => a.capturadoEm - b.capturadoEm);
   const ultimo = ordenados[ordenados.length - 1];
-  if (!ultimo) return { gravadoDesde: null, candidatos: [], segmentos: [] };
+  const origem = opcoes.origem ?? 'gravado';
+  if (!ultimo) return { origem, gravadoDesde: null, candidatos: [], segmentos: [] };
 
   const candidatos = [...ultimo.candidatos]
     .sort((a, b) => b.votos - a.votos)
@@ -75,5 +116,5 @@ export function montarSerie(
   }
   if (atual.length) segmentos.push(atual);
 
-  return { gravadoDesde: ordenados[0]!.capturadoEm, candidatos, segmentos };
+  return { origem, gravadoDesde: ordenados[0]!.capturadoEm, candidatos, segmentos };
 }

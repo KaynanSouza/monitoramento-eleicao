@@ -83,6 +83,9 @@ export const AgremiacaoSchema = z.object({
   nm: str,
   tp: z.enum(['i', 'c', 'f']), // isolado | coligação | federação
   com: str, // composição ("PL", "PSB / PDT / ...")
+  vag: str.optional(), // vagas obtidas (proporcionais)
+  tvtn: str.optional(), // total votos nominais (ausente em algumas UFs: somar os partidos)
+  tvtl: str.optional(), // total votos de legenda
   par: z.array(PartidoSchema),
 });
 

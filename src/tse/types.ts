@@ -49,6 +49,34 @@ export interface Resultado {
   votos: { total: number; validos: number; brancos: number; nulos: number; anuladosSubJudice: number };
   /** Ordenados por votos (desc), desempate pela ordem oficial `seq`. */
   candidatos: Candidato[];
+  /** Só em cargos proporcionais (Dep. Federal, Estadual, Distrital); null nos majoritários. */
+  proporcional: Proporcional | null;
+}
+
+/** Partido isolado, federação ou coligação que disputa as vagas como uma unidade. */
+export interface Agremiacao {
+  numero: string;
+  nome: string;
+  tipo: 'isolado' | 'coligacao' | 'federacao';
+  /** "PCDOB / PT / PV"; a sigla, se isolado. */
+  composicao: string;
+  /** Partido com mais votos (para cor e sigla curta). */
+  principal: { numero: string; sigla: string };
+  /** Vagas obtidas segundo o TSE (`vag`); null se o arquivo não traz. */
+  vagas: number | null;
+  votosNominais: number;
+  votosLegenda: number;
+  /** Nominais + legenda: o que conta para o quociente partidário. */
+  votos: number;
+  partidos: { numero: string; sigla: string; votosNominais: number; votosLegenda: number }[];
+}
+
+export interface Proporcional {
+  /** Quociente eleitoral (`qe`): válidos ÷ vagas. Null se ainda não publicado. */
+  quocienteEleitoral: number | null;
+  votosLegenda: number;
+  /** Ordenadas por vagas (desc) e depois votos (desc). */
+  agremiacoes: Agremiacao[];
 }
 
 export interface AcompanhamentoItem {

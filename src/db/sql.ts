@@ -49,7 +49,13 @@ export async function migrar(db: SqlDb): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []);
   const versao = row?.user_version ?? 0;
   for (let v = versao; v < MIGRACOES.length; v++) {
-    await db.execAsync(`BEGIN; ${MIGRACOES[v]} PRAGMA user_version = ${v + 1}; COMMIT;`);
+    try {
+      await db.execAsync(`BEGIN; ${MIGRACOES[v]} PRAGMA user_version = ${v + 1}; COMMIT;`);
+    } catch (e) {
+      // Sem o ROLLBACK a conexão fica com a transação aberta e toda nova tentativa falha.
+      await db.execAsync('ROLLBACK;').catch(() => undefined);
+      throw e;
+    }
   }
 }
 
@@ -208,8 +214,17 @@ function linhaParaSnapshot(r: LinhaSnapshot): Snapshot {
     pctSecoes: r.pct_secoes,
     totalizacaoFinal: r.totalizacao_final === 1,
     segundoPlano: r.segundo_plano === 1,
-    candidatos: JSON.parse(r.candidatos) as CandidatoSnapshot[],
+    candidatos: lerCandidatos(r.candidatos),
   };
+}
+
+function lerCandidatos(json: string): CandidatoSnapshot[] {
+  try {
+    const v: unknown = JSON.parse(json);
+    return Array.isArray(v) ? (v as CandidatoSnapshot[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 // ---------- ajustes ----------
@@ -225,7 +240,12 @@ export class RepositorioAjustes {
 
   private async ler<T>(chave: string, padrao: T): Promise<T> {
     const r = await this.db.getFirstAsync<{ valor: string }>('SELECT valor FROM ajustes WHERE chave = ?', [chave]);
-    return r ? (JSON.parse(r.valor) as T) : padrao;
+    if (!r) return padrao;
+    try {
+      return JSON.parse(r.valor) as T;
+    } catch {
+      return padrao; // valor corrompido não pode derrubar a resolução de eleições
+    }
   }
 
   private async gravar(chave: string, valor: unknown): Promise<void> {

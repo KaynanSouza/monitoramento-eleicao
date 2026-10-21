@@ -4,8 +4,11 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import type { Consulta } from '@/api/apuracao';
+import { FILTRO_VAZIO, type FiltroCandidatos as Filtro, filtrarCandidatos, partidosDaLista } from '@/lib/candidatos';
 import { nomeAbrangencia } from '@/lib/ufs';
+import { cargoNaAbrangencia } from '@/tse/eleicoes';
 import type { Candidato } from '@/tse/types';
+import { Bancada } from '@/ui/Bancada';
 import { AbasCargo, BarraSecoes, SeletorAbrangencia, SeloStatus } from '@/ui/Cabecalho';
 import { LinhaCandidato } from '@/ui/LinhaCandidato';
 import { mensagemErro } from '@/ui/mensagens';
@@ -15,10 +18,12 @@ import { useTema } from '@/ui/tema';
 import { GraficoEvolucao } from '@/ui/GraficoEvolucao';
 import { CartaoMapa } from '@/ui/mapa/CartaoMapa';
 import { Disputa } from '@/ui/Disputa';
+import { FiltroCandidatos } from '@/ui/FiltroCandidatos';
 import { SeletorTurno } from '@/ui/SeletorTurno';
 import { useCargos, useHistorico, useResultado, useTurnoPadrao, useUfsEmDisputa } from '@/ui/useApuracao';
 
 const TAG_TELA_LIGADA = 'apuracao';
+const SEM_CANDIDATOS: Candidato[] = [];
 
 export default function Apuracao() {
   const t = useTema();
@@ -30,7 +35,8 @@ export default function Apuracao() {
   const [seletorAberto, setSeletorAberto] = useState(false);
 
   const cargos = useCargos(turno);
-  const lista = cargos.data ?? [];
+  // Dep. Estadual some no DF e Dep. Distrital só aparece lá.
+  const lista = useMemo(() => (cargos.data ?? []).filter((c) => cargoNaAbrangencia(c, uf)), [cargos.data, uf]);
   const cargoAtual = lista.find((c) => c.codigo === cargo) ?? lista[0];
 
   const ufsDisputa = useUfsEmDisputa(turno, cargoAtual?.codigo).data ?? null;
@@ -53,10 +59,21 @@ export default function Apuracao() {
     };
   }, [finalizada, consulta !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const todos: Candidato[] = consulta ? (dados?.resultado.candidatos ?? []) : [];
+  const todos: Candidato[] = (consulta && dados?.resultado.candidatos) || SEM_CANDIDATOS;
   // 2º turno: tela de disputa com os dois candidatos lado a lado em vez da lista.
   const disputa = turno === 2 && todos.length === 2 ? (todos as [Candidato, Candidato]) : null;
-  const candidatos = disputa ? [] : todos;
+
+  // Proporcionais: busca e filtros. O filtro pertence à consulta: trocar cargo/UF/turno o zera.
+  const proporcional = consulta && dados?.resultado.proporcional ? dados.resultado : null;
+  const chaveConsulta = consulta ? `${consulta.turno}:${consulta.cargo}:${consulta.uf}` : '';
+  const [filtroSalvo, setFiltroSalvo] = useState<{ chave: string; filtro: Filtro }>({ chave: '', filtro: FILTRO_VAZIO });
+  const filtro = filtroSalvo.chave === chaveConsulta ? filtroSalvo.filtro : FILTRO_VAZIO;
+  const partidos = useMemo(() => (proporcional ? partidosDaLista(todos) : []), [proporcional, todos]);
+  const candidatos = useMemo(
+    () => (disputa ? SEM_CANDIDATOS : proporcional ? filtrarCandidatos(todos, filtro) : todos),
+    [disputa, proporcional, todos, filtro],
+  );
+  const comSituacao = todos.some((c) => c.situacao !== 'pendente');
 
   const cabecalho = useMemo(
     () => (
@@ -111,9 +128,22 @@ export default function Apuracao() {
         {consulta && q.isPending && <ActivityIndicator style={styles.carregando} color={t.textoSecundario} />}
         {consulta && dados && <BarraSecoes resultado={dados.resultado} />}
         {disputa && dados && <Disputa candidatos={disputa} foto={dados.foto} />}
+        {proporcional && <Bancada resultado={proporcional} />}
+        {proporcional && (
+          <FiltroCandidatos
+            filtro={filtro}
+            aoMudar={(f) => setFiltroSalvo({ chave: chaveConsulta, filtro: f })}
+            partidos={partidos}
+            exibidos={candidatos.length}
+            total={todos.length}
+            comSituacao={comSituacao}
+          />
+        )}
       </View>
     ),
-    [consulta, dados, disputa, uf, turno, lista, cargoAtual, cargos.error, precisaUf, semDisputa, q.error, q.isPending, t],
+    // prettier-ignore
+    [consulta, dados, disputa, uf, turno, lista, cargoAtual, cargos.error, precisaUf, semDisputa, q.error, q.isPending, t,
+      proporcional, filtro, chaveConsulta, partidos, candidatos.length, todos.length, comSituacao],
   );
 
   const recarregando = q.isRefetching && !q.isPending;
@@ -125,6 +155,12 @@ export default function Apuracao() {
         keyExtractor={(c) => c.sqcand}
         renderItem={({ item }) => <LinhaCandidato candidato={item} foto={dados?.foto(item.sqcand) ?? null} />}
         ListHeaderComponent={cabecalho}
+        ListEmptyComponent={
+          proporcional ? (
+            <Text style={[styles.semResultado, { color: t.textoSecundario }]}>Nenhum candidato com esses filtros.</Text>
+          ) : null
+        }
+        keyboardShouldPersistTaps="handled"
         ListFooterComponent={
           <>
             {consulta && dados && (
@@ -173,6 +209,7 @@ const styles = StyleSheet.create({
   linhaTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   erro: { fontSize: 15 },
   carregando: { marginVertical: 24 },
+  semResultado: { fontSize: 15, paddingHorizontal: 16, paddingVertical: 24, textAlign: 'center' },
   vazio: { padding: 16, borderRadius: 8, gap: 12, alignItems: 'flex-start' },
   vazioTexto: { fontSize: 16 },
   botao: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },

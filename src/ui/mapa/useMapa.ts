@@ -42,9 +42,10 @@ async function carregarUf(
   cargo: string,
   uf: string,
   aoProgredir?: (feitos: number, total: number) => void,
+  sinal?: AbortSignal,
 ): Promise<DadosMunicipios> {
   const s = await obterServicos();
-  const resultados = await s.apuracao.carregarMunicipios({ turno, cargo, uf }, { aoProgredir });
+  const resultados = await s.apuracao.carregarMunicipios({ turno, cargo, uf }, { aoProgredir, sinal });
   const resumos = new Map<string, ResumoArea>();
   for (const [ibge, r] of resultados) {
     const x = resumir(r);
@@ -65,8 +66,9 @@ export function useMapaMunicipios(turno: 1 | 2, cargo: string, ufs: string[], fi
   const qs = useQueries({
     queries: ufs.map((uf) => ({
       queryKey: chaveMunicipios(turno, cargo, uf),
-      queryFn: () =>
-        carregarUf(turno, cargo, uf, (f, total) => setProgresso((p) => ({ ...p, [uf]: [f, total] }))),
+      // `signal` do TanStack: aborta quando a query perde os observadores (tela fechada).
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        carregarUf(turno, cargo, uf, (f, total) => setProgresso((p) => ({ ...p, [uf]: [f, total] })), signal),
       refetchInterval: finalizada ? (false as const) : INTERVALO_MAPA_MS,
       staleTime: 30_000,
     })),

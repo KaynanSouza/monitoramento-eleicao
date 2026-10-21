@@ -76,6 +76,9 @@ async function main() {
     await get(acomp(EST, uf));
     for (const cargo of ['3', '5', '6']) await get(result(EST, uf, cargo));
   }
+  // Dep. Estadual (não existe no DF) e Dep. Distrital (só no DF): uma UF de cada.
+  await get(result(EST, 'sp', '7'));
+  await get(result(EST, 'df', '8'));
 
   // Municípios: AC inteiro (pres + gov) e as capitais SP/RJ (pres). Códigos só do cm.
   const munOf = (uf: string) => cm.abr.find((a) => a.cd === uf)?.mu ?? [];

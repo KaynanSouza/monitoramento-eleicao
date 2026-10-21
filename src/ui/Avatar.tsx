@@ -14,10 +14,11 @@ interface Props {
 
 /** Foto circular do candidato com fallback para iniciais na cor do partido. */
 export function Avatar({ nome, cor, foto, tamanho = 48 }: Props) {
-  const [falhou, setFalhou] = useState(false);
+  // Guarda QUAL URL falhou: se a foto mudar (outra aba, outro candidato), tenta de novo.
+  const [falhou, setFalhou] = useState<string | null>(null);
   const estilo = { width: tamanho, height: tamanho, borderRadius: tamanho / 2, borderColor: cor };
 
-  if (foto && !falhou) {
+  if (foto && falhou !== foto) {
     return (
       <Image
         source={foto}
@@ -25,7 +26,7 @@ export function Avatar({ nome, cor, foto, tamanho = 48 }: Props) {
         cachePolicy="disk"
         contentFit="cover"
         recyclingKey={foto}
-        onError={() => setFalhou(true)}
+        onError={() => setFalhou(foto)}
         accessible={false}
       />
     );

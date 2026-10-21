@@ -23,6 +23,19 @@ describe('SQLite (node:sqlite com o mesmo SQL do app)', () => {
     expect((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []))?.user_version).toBe(1);
   });
 
+  it('ajuste corrompido no banco volta ao padrão em vez de quebrar', async () => {
+    const db = await bancoEmMemoria();
+    await db.runAsync("INSERT INTO ajustes (chave, valor) VALUES ('codigos_manuais', '{quebrado')", []);
+    expect(await new RepositorioAjustes(db).codigosManuais()).toEqual({});
+  });
+
+  it('migração que falha desfaz a transação (nova tentativa é possível)', async () => {
+    const db = await bancoEmMemoria();
+    await db.execAsync('PRAGMA user_version = 0;'); // força reaplicar: CREATE TABLE falha (já existe)
+    await expect(migrar(db)).rejects.toThrow();
+    await db.execAsync('BEGIN; COMMIT;'); // lançaria "transaction within a transaction" sem o ROLLBACK
+  });
+
   it('cache HTTP: ida e volta', async () => {
     const c = new SqlCacheHttp(await bancoEmMemoria());
     const e = {
