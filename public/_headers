@@ -1,0 +1,5 @@
+# Cloudflare Pages. O expo-sqlite na web precisa de SharedArrayBuffer, que exige estes
+# cabeçalhos. "require-corp" (e não "credentialless") porque o Safari do iPhone só aceita esse.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

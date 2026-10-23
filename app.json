@@ -9,12 +9,20 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "dev.kaynan.apuracao2026"
+      "bundleIdentifier": "dev.kaynan.apuracao2026",
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "dev.kaynan.apuracao2026",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#8F0F15",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -38,6 +46,14 @@
       "eas": {
         "projectId": "7f144570-0ee4-4b83-aa17-7dabda0fa961"
       }
+    },
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "Apuração 2026",
+      "shortName": "Apuração",
+      "themeColor": "#8F0F15"
     }
   }
 }

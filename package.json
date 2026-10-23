@@ -15,7 +15,8 @@
     "build-geo": "tsx scripts/build-geo.ts",
     "build-replay": "tsx scripts/build-replay.ts",
     "smoke": "tsx scripts/smoke-tse.ts",
-    "apk": "node scripts/build-apk.mjs"
+    "apk": "node scripts/build-apk.mjs",
+    "web": "expo export -p web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",

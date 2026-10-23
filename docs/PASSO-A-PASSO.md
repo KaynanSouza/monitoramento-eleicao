@@ -3,6 +3,8 @@
 Tudo aqui é gratuito e local: nada de EAS, loja ou servidor. Os comandos são para
 o **PowerShell** do Windows, dentro da pasta do projeto.
 
+> Para iPhone, veja [IOS.md](IOS.md). No iOS o build é feito pelo EAS e exige a conta paga da Apple.
+
 ---
 
 ## 1. Commit e merge na `main`

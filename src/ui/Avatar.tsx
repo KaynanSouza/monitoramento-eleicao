@@ -1,8 +1,8 @@
-import { Image } from 'expo-image';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { iniciais } from '@/lib/format';
 import { corTextoSobre } from '@/lib/partidos';
+import { Foto } from './Foto';
 
 interface Props {
   nome: string;
@@ -20,15 +20,7 @@ export function Avatar({ nome, cor, foto, tamanho = 48 }: Props) {
 
   if (foto && falhou !== foto) {
     return (
-      <Image
-        source={foto}
-        style={[styles.base, estilo]}
-        cachePolicy="disk"
-        contentFit="cover"
-        recyclingKey={foto}
-        onError={() => setFalhou(foto)}
-        accessible={false}
-      />
+      <Foto uri={foto} tamanho={tamanho} estilo={[styles.base, estilo]} onError={() => setFalhou(foto)} />
     );
   }
   return (

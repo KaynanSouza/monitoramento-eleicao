@@ -62,7 +62,8 @@ writeFileSync(pacote, pacoteOriginal);
 if (prebuild.status !== 0) falhar('Falhou: expo prebuild');
 
 // 4. Gradle
-const gradle = windows ? 'gradlew.bat' : './gradlew';
+// Caminho explícito: com NoDefaultCurrentDirectoryInExePath o cmd não procura na pasta atual.
+const gradle = windows ? '.\\gradlew.bat' : './gradlew';
 const gradleArgs = ['assembleRelease'];
 if (!args.has('--todas-arquiteturas')) gradleArgs.push('-PreactNativeArchitectures=arm64-v8a');
 executar(gradle, gradleArgs, { cwd: join(RAIZ, 'android'), env });

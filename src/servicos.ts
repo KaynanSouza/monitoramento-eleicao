@@ -40,7 +40,9 @@ async function criar(): Promise<Servicos> {
   const db = await abrirBanco(replay ? 'apuracao-replay.db' : 'apuracao.db');
 
   let endpoint: TseEndpoint = { base: config.tseBase, ambiente: config.ambiente, ciclo: config.ciclo };
-  let fetchFn: typeof fetch = fetch;
+  // Arrow: no navegador, chamar o fetch nativo como método de outro objeto (this.o.fetch)
+  // lança "Illegal invocation".
+  let fetchFn: typeof fetch = (entrada, init) => fetch(entrada, init);
   if (replay) {
     // Carregado só no replay; o JSON (~1,3 MB) vai no bundle, mas não é avaliado no modo oficial.
     const { Simulador, criarFetchReplay } = require('./replay/simulador') as typeof import('./replay/simulador');
